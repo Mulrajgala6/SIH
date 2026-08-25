@@ -1,0 +1,32 @@
+# DAKSYNC — local infrastructure.
+#
+# PostgreSQL is the recommended database. The backend also runs on a zero-config
+# SQLite fallback, so this file is OPTIONAL. To use Postgres:
+#
+#   docker compose up -d db
+#   # then in backend/.env:
+#   DATABASE_URL=postgresql+psycopg2://daksync:daksync@localhost:5432/daksync
+#
+# (Backend and frontend run on the host during development — see README.)
+
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: daksync-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: daksync
+      POSTGRES_PASSWORD: daksync
+      POSTGRES_DB: daksync
+    ports:
+      - "5432:5432"
+    volumes:
+      - daksync_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U daksync"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  daksync_pgdata:

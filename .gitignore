@@ -1,0 +1,45 @@
+# ── Python / backend ─────────────────────────────
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+*.db
+*.sqlite3
+
+# ── Node / frontend ──────────────────────────────
+node_modules/
+.next/
+out/
+dist/
+build/
+npm-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# ── Environment ──────────────────────────────────
+.env
+.env.local
+.env.*.local
+
+# ── Flutter / mobile (Phase 8) ───────────────────
+mobile/build/
+mobile/.dart_tool/
+mobile/.flutter-plugins
+mobile/.flutter-plugins-dependencies
+mobile/.packages
+mobile/.pub-cache/
+mobile/.pub/
+
+# ── ML artifacts ─────────────────────────────────
+*.joblib
+*.pkl
+
+# ── OS / IDE ─────────────────────────────────────
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
