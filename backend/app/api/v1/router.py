@@ -4,7 +4,17 @@ from __future__ import annotations
 
 from fastapi import APIRouter
 
-from app.api.v1 import analytics, auth, consignments, deliveries, geocoding, routes, slots
+from app.api.v1 import (
+    analytics,
+    auth,
+    consignments,
+    deliveries,
+    geocoding,
+    post_offices,
+    routes,
+    slots,
+    transit,
+)
 
 api_router = APIRouter()
 api_router.include_router(auth.router)
@@ -14,3 +24,5 @@ api_router.include_router(routes.router)
 api_router.include_router(deliveries.router)
 api_router.include_router(analytics.router)
 api_router.include_router(geocoding.router)
+api_router.include_router(post_offices.router)
+api_router.include_router(transit.router)

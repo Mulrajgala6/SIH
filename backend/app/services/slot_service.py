@@ -89,8 +89,11 @@ def _slot_loads(db: Session, cons: Consignment, target_day: datetime) -> tuple[l
         .all()
     )
     agent_windows = [(a.work_start_minutes, a.work_end_minutes) for a in agents]
+    if not agent_windows:
+        # Standard post office delivery window (8:30 AM to 8:30 PM covering all slots)
+        agent_windows = [(510, 1230)]
     total_capacity = sum(a.daily_capacity for a in agents) or 40
-    per_slot_cap = max(1, total_capacity // max(1, len(slots)))
+    per_slot_cap = max(10, total_capacity // max(1, len(slots)))
 
     start, end = _day_bounds(target_day)
     loads = []

@@ -10,7 +10,8 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from app.api.deps import call_service, get_db, require_roles
+from app.api.deps import call_service, get_current_user, get_db, require_roles
+from app.models.entities import User
 from app.models.enums import ConsignmentStatus, Role
 from app.schemas.consignment import (
     ConsignmentBrief,
@@ -47,6 +48,35 @@ def list_consignments(
 ) -> list[ConsignmentBrief]:
     rows = consignment_service.list_consignments(
         db, status=status_filter, post_office_id=post_office_id, q=q, limit=limit
+    )
+    return [ConsignmentBrief.model_validate(c) for c in rows]
+
+
+@router.get("/my-sent", response_model=list[ConsignmentBrief])
+def list_my_sent_consignments(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> list[ConsignmentBrief]:
+    """List all consignments booked by the current logged-in sender/customer."""
+    rows = consignment_service.list_my_sent(
+        db,
+        sender_name=user.full_name,
+        phone=user.phone,
+        user_id=user.id,
+    )
+    return [ConsignmentBrief.model_validate(c) for c in rows]
+
+
+@router.get("/my-received", response_model=list[ConsignmentBrief])
+def list_my_received_consignments(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> list[ConsignmentBrief]:
+    """List all incoming consignments addressed to the current logged-in recipient/customer."""
+    rows = consignment_service.list_my_received(
+        db,
+        phone=user.phone,
+        user_id=user.id,
     )
     return [ConsignmentBrief.model_validate(c) for c in rows]
 

@@ -11,8 +11,11 @@ export type BadgeKind = "consignment" | "route" | "stop";
 
 const CONSIGNMENT_CLASSES: Record<ConsignmentStatus, string> = {
   BOOKED: "bg-slate-100 text-slate-700",
+  RECEIVED_AT_ORIGIN: "bg-blue-50 text-blue-700 font-semibold",
   COLLECTED: "bg-slate-100 text-slate-700",
   SORTED: "bg-sky-50 text-sky-700",
+  IN_TRANSIT: "bg-indigo-50 text-indigo-700 font-semibold",
+  RECEIVED_AT_DESTINATION: "bg-purple-50 text-purple-700 font-semibold",
   SLOT_PENDING: "bg-amber-50 text-amber-700",
   SLOT_CONFIRMED: "bg-brand-50 text-brand-700",
   OUT_FOR_DELIVERY: "bg-indigo-50 text-indigo-700",

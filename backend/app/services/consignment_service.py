@@ -8,6 +8,9 @@ SLOT_PENDING so the recipient can choose a time.
 
 from __future__ import annotations
 
+from datetime import datetime, timezone
+import random
+
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
@@ -104,11 +107,18 @@ def _create_address(db: Session, recipient_id: int, payload: ConsignmentCreate) 
 # --------------------------------------------------------------------------- #
 # Public API
 # --------------------------------------------------------------------------- #
-def create_consignment(db: Session, payload: ConsignmentCreate) -> Consignment:
+def create_consignment(
+    db: Session,
+    payload: ConsignmentCreate,
+    current_user_id: int | None = None,
+) -> Consignment:
     sender = _resolve_sender(db, payload)
     recipient = _resolve_recipient(db, payload)
     address = _create_address(db, recipient.id, payload)
-    po = pick_post_office(db, address.pincode, address.latitude, address.longitude)
+    dest_po = pick_post_office(db, address.pincode, address.latitude, address.longitude)
+
+    # Origin post office: drop-off counter chosen by sender or closest to sender
+    origin_po_id = payload.origin_post_office_id or dest_po.id
 
     requested_slot: DeliverySlot | None = None
     if payload.requested_slot_code:
@@ -118,28 +128,243 @@ def create_consignment(db: Session, payload: ConsignmentCreate) -> Consignment:
         except ValueError:
             requested_slot = None
 
+    # Status: If inter-region (e.g. Nashik to Mumbai), start at BOOKED;
+    # if local intra-hub, start at SLOT_PENDING for immediate recipient slot selection.
+    initial_status = (
+        ConsignmentStatus.BOOKED
+        if origin_po_id != dest_po.id
+        else ConsignmentStatus.SLOT_PENDING
+    )
+
     cons = Consignment(
         tracking_number=_next_tracking_number(db),
-        sender_id=sender.id, recipient_id=recipient.id, address_id=address.id,
-        post_office_id=po.id, status=ConsignmentStatus.SLOT_PENDING,
+        sender_id=sender.id,
+        recipient_id=recipient.id,
+        address_id=address.id,
+        post_office_id=dest_po.id,
+        origin_post_office_id=origin_po_id,
+        status=initial_status,
         priority=payload.priority or Priority.NORMAL,
-        description=payload.description, weight_grams=payload.weight_grams,
+        description=payload.description,
+        weight_grams=payload.weight_grams,
         requested_slot_id=requested_slot.id if requested_slot else None,
     )
     db.add(cons)
     db.flush()
 
     if requested_slot is not None:
-        db.add(SlotPreference(
-            consignment_id=cons.id, slot_id=requested_slot.id,
-            preference_type=PreferenceType.SENDER_REQUESTED, source="sender",
-        ))
+        db.add(
+            SlotPreference(
+                consignment_id=cons.id,
+                slot_id=requested_slot.id,
+                preference_type=PreferenceType.SENDER_REQUESTED,
+                source="sender",
+            )
+        )
 
-    notification_service.notify_slot_request(db, recipient.id, cons.id, cons.tracking_number)
+    notification_service.notify_slot_request(
+        db, recipient.id, cons.id, cons.tracking_number
+    )
 
     db.commit()
     db.refresh(cons)
     return cons
+
+
+def get_outgoing_groups(db: Session, origin_post_office_id: int) -> list[dict[str, any]]:
+    """Group booked parcels at an origin office by their destination post office for clubbing."""
+    # Parcels currently at this origin post office needing inter-region transit
+    consignments = (
+        db.query(Consignment)
+        .filter(
+            Consignment.origin_post_office_id == origin_post_office_id,
+            Consignment.post_office_id != origin_post_office_id,
+            Consignment.status.in_([ConsignmentStatus.BOOKED, ConsignmentStatus.RECEIVED_AT_ORIGIN]),
+        )
+        .all()
+    )
+
+    # Group by destination post office
+    groups_by_dest: dict[int, list[Consignment]] = {}
+    for c in consignments:
+        groups_by_dest.setdefault(c.post_office_id, []).append(c)
+
+    results = []
+    for dest_id, items in groups_by_dest.items():
+        dest_po = db.get(PostOffice, dest_id)
+        if dest_po:
+            total_weight = sum((item.weight_grams or 0) for item in items)
+            results.append(
+                {
+                    "destination_post_office": dest_po,
+                    "consignment_count": len(items),
+                    "total_weight_grams": total_weight,
+                    "consignments": items,
+                }
+            )
+    return results
+
+
+def dispatch_transit_bag(
+    db: Session,
+    origin_post_office_id: int,
+    destination_post_office_id: int,
+    consignment_ids: list[int],
+    custom_bag_number: str | None = None,
+) -> dict[str, any]:
+    """Club selected parcels into a sealed transit bag and dispatch to destination regional hub."""
+    origin_po = db.get(PostOffice, origin_post_office_id)
+    dest_po = db.get(PostOffice, destination_post_office_id)
+    if not origin_po or not dest_po:
+        raise ValueError("Invalid origin or destination post office.")
+
+    clean_orig = origin_po.code.replace("-", "")[:3].upper()
+    clean_dest = dest_po.code.replace("-", "")[:3].upper()
+    bag_number = custom_bag_number or f"BAG-{clean_orig}-{clean_dest}-{random.randint(100, 999)}"
+
+    consignments = (
+        db.query(Consignment)
+        .filter(
+            Consignment.id.in_(consignment_ids),
+            Consignment.origin_post_office_id == origin_post_office_id,
+            Consignment.post_office_id == destination_post_office_id,
+        )
+        .all()
+    )
+
+    if not consignments:
+        raise ValueError("No matching consignments found to dispatch.")
+
+    updated_ids = []
+    for c in consignments:
+        c.bag_number = bag_number
+        c.status = ConsignmentStatus.IN_TRANSIT
+        updated_ids.append(c.id)
+
+    db.commit()
+
+    return {
+        "bag_number": bag_number,
+        "origin_post_office": origin_po,
+        "destination_post_office": dest_po,
+        "dispatched_count": len(updated_ids),
+        "consignment_ids": updated_ids,
+        "status": "IN_TRANSIT",
+    }
+
+
+def receive_transit_bag(
+    db: Session,
+    destination_post_office_id: int,
+    bag_number: str,
+) -> dict[str, any]:
+    """Receive and unbag incoming transit batch at destination regional hub, preparing parcels for local delivery."""
+    dest_po = db.get(PostOffice, destination_post_office_id)
+    if not dest_po:
+        raise ValueError("Invalid destination post office.")
+
+    clean_bag = bag_number.strip().upper()
+
+    consignments = (
+        db.query(Consignment)
+        .filter(
+            func.upper(Consignment.bag_number) == clean_bag,
+            Consignment.post_office_id == destination_post_office_id,
+            Consignment.status == ConsignmentStatus.IN_TRANSIT,
+        )
+        .all()
+    )
+
+    if not consignments:
+        # Check if bag was already received
+        already = (
+            db.query(Consignment)
+            .filter(
+                func.upper(Consignment.bag_number) == clean_bag,
+                Consignment.post_office_id == destination_post_office_id,
+            )
+            .all()
+        )
+        if already:
+            raise ValueError(f"Bag {bag_number} has already been received & unbagged.")
+        raise ValueError(
+            f"No in-transit parcels found with bag number {bag_number} bound for {dest_po.name}."
+        )
+
+    # Find a default slot to ensure parcels can be routed today
+    default_slot = db.query(DeliverySlot).order_by(DeliverySlot.sort_order.asc()).first()
+    today_dt = datetime.now(timezone.utc)
+
+    updated_ids = []
+    for c in consignments:
+        # Mark as SLOT_CONFIRMED and set delivery_date to today so it appears in the regional route optimizer
+        c.status = ConsignmentStatus.SLOT_CONFIRMED
+        c.delivery_date = today_dt
+        if c.confirmed_slot_id is None:
+            assigned_slot = (
+                c.recommended_slot_id
+                or c.requested_slot_id
+                or (default_slot.id if default_slot else None)
+            )
+            c.confirmed_slot_id = assigned_slot
+            if assigned_slot:
+                db.add(
+                    SlotPreference(
+                        consignment_id=c.id,
+                        slot_id=assigned_slot,
+                        preference_type=PreferenceType.RECIPIENT_CONFIRMED,
+                        source="transit_unbagging",
+                    )
+                )
+        updated_ids.append(c.id)
+
+    db.commit()
+
+    return {
+        "bag_number": clean_bag,
+        "destination_post_office": dest_po,
+        "unbagged_count": len(updated_ids),
+        "consignment_ids": updated_ids,
+        "status": "RECEIVED_AT_DESTINATION",
+    }
+
+
+def get_incoming_bags(db: Session, destination_post_office_id: int) -> list[dict[str, any]]:
+    """List all in-transit bags currently on their way to this destination post office."""
+    consignments = (
+        db.query(Consignment)
+        .filter(
+            Consignment.post_office_id == destination_post_office_id,
+            Consignment.status == ConsignmentStatus.IN_TRANSIT,
+            Consignment.bag_number.isnot(None),
+        )
+        .all()
+    )
+
+    bags_map: dict[str, list[Consignment]] = {}
+    for c in consignments:
+        if c.bag_number:
+            bags_map.setdefault(c.bag_number, []).append(c)
+
+    results = []
+    for bag_no, items in bags_map.items():
+        origin_po = (
+            items[0].origin_post_office
+            or (db.get(PostOffice, items[0].origin_post_office_id) if items[0].origin_post_office_id else None)
+            or db.get(PostOffice, destination_post_office_id)
+        )
+        results.append(
+            {
+                "bag_number": bag_no,
+                "origin_post_office": origin_po,
+                "destination_post_office": db.get(PostOffice, destination_post_office_id),
+                "item_count": len(items),
+                "total_weight_grams": sum((item.weight_grams or 0) for item in items),
+                "consignments": items,
+                "status": "IN_TRANSIT",
+            }
+        )
+    return results
 
 
 def get_consignment(db: Session, consignment_id: int) -> Consignment | None:
@@ -154,6 +379,7 @@ def list_consignments(
     db: Session,
     status: ConsignmentStatus | None = None,
     post_office_id: int | None = None,
+    origin_post_office_id: int | None = None,
     q: str | None = None,
     limit: int = 200,
 ) -> list[Consignment]:
@@ -162,17 +388,64 @@ def list_consignments(
         query = query.filter(Consignment.status == status)
     if post_office_id is not None:
         query = query.filter(Consignment.post_office_id == post_office_id)
+    if origin_post_office_id is not None:
+        query = query.filter(Consignment.origin_post_office_id == origin_post_office_id)
     if q:
         like = f"%{q}%"
         query = query.join(Recipient, Consignment.recipient_id == Recipient.id).filter(
-            or_(Consignment.tracking_number.ilike(like), Recipient.name.ilike(like))
+            or_(
+                Consignment.tracking_number.ilike(like),
+                Recipient.name.ilike(like),
+                Consignment.bag_number.ilike(like),
+            )
         )
     return query.order_by(Consignment.created_at.desc()).limit(limit).all()
 
 
+def list_my_sent(
+    db: Session,
+    sender_name: str | None = None,
+    phone: str | None = None,
+    user_id: int | None = None,
+) -> list[Consignment]:
+    """Find all consignments booked by this sender."""
+    query = db.query(Consignment).join(Sender, Consignment.sender_id == Sender.id)
+    filters = []
+    if sender_name:
+        filters.append(Sender.name.ilike(f"%{sender_name}%"))
+    if phone:
+        filters.append(Sender.phone == phone)
+    if user_id:
+        filters.append(Sender.user_id == user_id)
+
+    if filters:
+        query = query.filter(or_(*filters))
+    return query.order_by(Consignment.created_at.desc()).limit(100).all()
+
+
+def list_my_received(
+    db: Session,
+    phone: str | None = None,
+    user_id: int | None = None,
+) -> list[Consignment]:
+    """Find all consignments addressed to this recipient."""
+    query = db.query(Consignment).join(Recipient, Consignment.recipient_id == Recipient.id)
+    filters = []
+    if phone:
+        filters.append(Recipient.phone == phone)
+    if user_id:
+        filters.append(Recipient.user_id == user_id)
+
+    if filters:
+        query = query.filter(or_(*filters))
+    return query.order_by(Consignment.created_at.desc()).limit(100).all()
+
+
 def update_consignment(
-    db: Session, consignment_id: int,
-    status: ConsignmentStatus | None = None, priority: Priority | None = None,
+    db: Session,
+    consignment_id: int,
+    status: ConsignmentStatus | None = None,
+    priority: Priority | None = None,
 ) -> Consignment | None:
     cons = db.get(Consignment, consignment_id)
     if cons is None:

@@ -198,6 +198,8 @@ class Consignment(TimestampMixin, Base):
     recipient_id: Mapped[int] = mapped_column(ForeignKey("recipients.id"), index=True)
     address_id: Mapped[int] = mapped_column(ForeignKey("addresses.id"), index=True)
     post_office_id: Mapped[int] = mapped_column(ForeignKey("post_offices.id"), index=True)
+    origin_post_office_id: Mapped[int | None] = mapped_column(ForeignKey("post_offices.id"), index=True)
+    bag_number: Mapped[str | None] = mapped_column(String(40), index=True)
 
     status: Mapped[ConsignmentStatus] = mapped_column(
         enum_col(ConsignmentStatus), default=ConsignmentStatus.BOOKED, index=True
@@ -216,7 +218,8 @@ class Consignment(TimestampMixin, Base):
     sender: Mapped["Sender"] = relationship(back_populates="consignments")
     recipient: Mapped["Recipient"] = relationship(back_populates="consignments")
     address: Mapped["Address"] = relationship()
-    post_office: Mapped["PostOffice"] = relationship()
+    post_office: Mapped["PostOffice"] = relationship(foreign_keys=[post_office_id])
+    origin_post_office: Mapped["PostOffice | None"] = relationship(foreign_keys=[origin_post_office_id])
 
     requested_slot: Mapped["DeliverySlot | None"] = relationship(
         foreign_keys=[requested_slot_id]

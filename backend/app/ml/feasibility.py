@@ -27,8 +27,12 @@ def within_any_window(start: int, end: int, agent_windows: list[tuple[int, int]]
 def is_feasible(load: SlotLoad, agent_windows: list[tuple[int, int]]) -> bool:
     if load.capacity <= 0:
         return False
+    if not agent_windows:
+        return load.confirmed_count < load.capacity
     if not within_any_window(load.start_minutes, load.end_minutes, agent_windows):
-        return False
+        overlaps = any(ws < load.end_minutes and load.start_minutes < we for ws, we in agent_windows)
+        if not overlaps:
+            return False
     return load.confirmed_count < load.capacity
 
 

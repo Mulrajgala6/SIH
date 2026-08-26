@@ -7,6 +7,7 @@ from datetime import datetime
 from pydantic import BaseModel, ConfigDict, Field
 
 from app.models.enums import ConsignmentStatus, Priority
+from app.schemas.post_office import PostOfficeBrief
 from app.schemas.slot import SlotOut
 
 
@@ -64,6 +65,9 @@ class ConsignmentCreate(BaseModel):
     sender_id: int | None = None
     sender_name: str | None = None
 
+    # Origin drop-off post office where the sender submits the parcel
+    origin_post_office_id: int | None = None
+
     recipient: RecipientIn
     address: AddressIn
 
@@ -88,6 +92,11 @@ class ConsignmentOut(BaseModel):
     recipient: RecipientOut
     address: AddressOut
     post_office_id: int
+    origin_post_office_id: int | None = None
+    bag_number: str | None = None
+
+    post_office: PostOfficeBrief | None = None
+    origin_post_office: PostOfficeBrief | None = None
 
     requested_slot: SlotOut | None = None
     recommended_slot: SlotOut | None = None
@@ -108,6 +117,9 @@ class ConsignmentBrief(BaseModel):
     priority: Priority
     recipient: RecipientOut
     address: AddressOut
+    post_office_id: int | None = None
+    origin_post_office_id: int | None = None
+    bag_number: str | None = None
     confirmed_slot: SlotOut | None = None
 
 

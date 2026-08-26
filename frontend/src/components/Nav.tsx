@@ -45,7 +45,7 @@ function NavLink({
 
 export function Nav() {
   const { user, logout } = useAuth();
-  const { t } = useI18n();
+  const { t, lang } = useI18n();
   const pathname = usePathname();
   const router = useRouter();
 
@@ -56,7 +56,8 @@ export function Nav() {
   const senderRoles: Role[] = ["SENDER", "SUPERVISOR", "ADMIN"];
 
   const showDashboard = user ? staffRoles.includes(user.role) : false;
-  const showNew = user ? senderRoles.includes(user.role) : false;
+  const showNew = user ? (user.role === "SENDER" || staffRoles.includes(user.role)) : true;
+  const showMyParcels = user ? (user.role === "SENDER" || user.role === "RECIPIENT") : false;
 
   const handleLogout = () => {
     logout();
@@ -70,6 +71,13 @@ export function Nav() {
 
         <div className="ml-auto flex flex-wrap items-center gap-1.5">
           <NavLink href="/track" label={t("nav.track")} active={isActive("/track")} />
+          {showMyParcels ? (
+            <NavLink
+              href="/my-parcels"
+              label={lang === "hi" ? "मेरे पार्सल" : "My Parcels"}
+              active={isActive("/my-parcels")}
+            />
+          ) : null}
           {showDashboard ? (
             <NavLink
               href="/dashboard"
@@ -80,7 +88,7 @@ export function Nav() {
           {showNew ? (
             <NavLink
               href="/consignments/new"
-              label={t("nav.newConsignment")}
+              label={lang === "hi" ? "पार्सल बुक करें" : "Book Parcel"}
               active={pathname === "/consignments/new"}
             />
           ) : null}

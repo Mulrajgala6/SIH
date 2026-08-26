@@ -26,8 +26,11 @@ export type SlotCode = "MORNING" | "MIDDAY" | "AFTERNOON" | "EVENING";
 
 export type ConsignmentStatus =
   | "BOOKED"
+  | "RECEIVED_AT_ORIGIN"
   | "COLLECTED"
   | "SORTED"
+  | "IN_TRANSIT"
+  | "RECEIVED_AT_DESTINATION"
   | "SLOT_PENDING"
   | "SLOT_CONFIRMED"
   | "OUT_FOR_DELIVERY"
@@ -154,6 +157,15 @@ export interface AddressOut {
   is_geocoded: boolean;
 }
 
+export interface PostOfficeOut {
+  id: number;
+  code: string;
+  name: string;
+  pincode: string;
+  latitude: number;
+  longitude: number;
+}
+
 export interface ConsignmentOut {
   id: number;
   tracking_number: string;
@@ -165,6 +177,10 @@ export interface ConsignmentOut {
   recipient: RecipientOut;
   address: AddressOut;
   post_office_id: number | null;
+  origin_post_office_id?: number | null;
+  bag_number?: string | null;
+  post_office?: PostOfficeBrief | null;
+  origin_post_office?: PostOfficeBrief | null;
   requested_slot: SlotOut | null;
   recommended_slot: SlotOut | null;
   confirmed_slot: SlotOut | null;
@@ -179,6 +195,9 @@ export interface ConsignmentBrief {
   priority: Priority;
   recipient: RecipientOut;
   address: AddressOut;
+  post_office_id?: number | null;
+  origin_post_office_id?: number | null;
+  bag_number?: string | null;
   confirmed_slot: SlotOut | null;
 }
 
@@ -186,6 +205,7 @@ export interface ConsignmentBrief {
 export interface ConsignmentCreate {
   sender_id: number | null;
   sender_name: string | null;
+  origin_post_office_id?: number | null;
   recipient: {
     name: string;
     phone: string;
@@ -659,6 +679,119 @@ export function listLocalities(): Promise<LocalityPreset[]> {
 export function forwardGeocode(locality: string, city = "Nashik", pincode = ""): Promise<ForwardGeocodeOut> {
   const query = buildQuery({ locality, city, pincode });
   return apiFetch<ForwardGeocodeOut>(`/api/v1/geocoding/forward${query}`);
+}
+
+/* ------------------------------------------------------------------ */
+/* Post Offices & Transit Bagging                                      */
+/* ------------------------------------------------------------------ */
+
+export function listPostOffices(): Promise<PostOfficeOut[]> {
+  return apiFetch<PostOfficeOut[]>("/api/v1/post-offices");
+}
+
+export interface UserRegisterRequest {
+  email: string;
+  password: string;
+  full_name: string;
+  phone?: string | null;
+  role?: Role;
+}
+
+export function registerUser(payload: UserRegisterRequest): Promise<LoginResponse> {
+  return apiFetch<LoginResponse>("/api/v1/auth/register", {
+    method: "POST",
+    body: payload,
+  });
+}
+
+export function listMySent(token?: string): Promise<ConsignmentBrief[]> {
+  return apiFetch<ConsignmentBrief[]>("/api/v1/consignments/my-sent", { token });
+}
+
+export function listMyReceived(token?: string): Promise<ConsignmentBrief[]> {
+  return apiFetch<ConsignmentBrief[]>("/api/v1/consignments/my-received", { token });
+}
+
+export interface OutgoingGroup {
+  destination_post_office: PostOfficeBrief;
+  consignment_count: number;
+  total_weight_grams: number;
+  consignments: ConsignmentBrief[];
+}
+
+export interface DispatchBagRequest {
+  origin_post_office_id: number;
+  destination_post_office_id: number;
+  consignment_ids: number[];
+  custom_bag_number?: string;
+}
+
+export interface DispatchBagResponse {
+  bag_number: string;
+  origin_post_office: PostOfficeBrief;
+  destination_post_office: PostOfficeBrief;
+  dispatched_count: number;
+  consignment_ids: number[];
+  status: string;
+}
+
+export interface ReceiveBagRequest {
+  destination_post_office_id: number;
+  bag_number: string;
+}
+
+export interface ReceiveBagResponse {
+  bag_number: string;
+  destination_post_office: PostOfficeBrief;
+  unbagged_count: number;
+  consignment_ids: number[];
+  status: string;
+}
+
+export interface IncomingBagGroup {
+  bag_number: string;
+  origin_post_office: PostOfficeBrief;
+  destination_post_office: PostOfficeBrief;
+  item_count: number;
+  total_weight_grams: number;
+  consignments: ConsignmentBrief[];
+  status: string;
+}
+
+export function listIncomingBags(destinationPostOfficeId: number, token?: string): Promise<IncomingBagGroup[]> {
+  return apiFetch<IncomingBagGroup[]>(
+    `/api/v1/transit/incoming-bags?destination_post_office_id=${encodeURIComponent(destinationPostOfficeId)}`,
+    { token },
+  );
+}
+
+export function listOutgoingGroups(originPostOfficeId: number, token?: string): Promise<OutgoingGroup[]> {
+  return apiFetch<OutgoingGroup[]>(
+    `/api/v1/transit/outgoing-groups?origin_post_office_id=${encodeURIComponent(originPostOfficeId)}`,
+    { token },
+  );
+}
+
+export function dispatchBag(payload: DispatchBagRequest, token?: string): Promise<DispatchBagResponse> {
+  return apiFetch<DispatchBagResponse>(
+    "/api/v1/transit/dispatch-bag",
+    {
+      method: "POST",
+      body: payload,
+      token,
+    },
+  );
+}
+
+export function receiveBag(payload: ReceiveBagRequest, token?: string): Promise<ReceiveBagResponse> {
+  return apiFetch<ReceiveBagResponse>(
+    "/api/v1/transit/receive-bag",
+    {
+      method: "POST",
+      body: payload,
+      token,
+    },
+  );
 }
 
 /* ------------------------------------------------------------------ */

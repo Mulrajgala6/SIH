@@ -10,9 +10,11 @@ import { Button } from "@/components/Button";
 import { LocationPickerMap } from "@/components/LocationPickerMap";
 import {
   createConsignment,
+  listPostOffices,
   listSlots,
   type ConsignmentCreate,
   type ConsignmentOut,
+  type PostOfficeOut,
   type PreferredLanguage,
   type Priority,
   type SlotCode,
@@ -26,7 +28,7 @@ export default function NewConsignmentPage() {
   return (
     <div className={lang === "hi" ? "font-hindi" : ""}>
       <Nav />
-      <RequireRole roles={["SENDER", "SUPERVISOR", "ADMIN"]}>
+      <RequireRole roles={["SENDER", "SUPERVISOR", "ADMIN", "RECIPIENT"]}>
         <BookingForm />
       </RequireRole>
     </div>
@@ -35,11 +37,13 @@ export default function NewConsignmentPage() {
 
 function BookingForm() {
   const { t, lang } = useI18n();
-  const { token } = useAuth();
+  const { token, user } = useAuth();
 
   const [slots, setSlots] = useState<SlotOut[]>([]);
+  const [postOffices, setPostOffices] = useState<PostOfficeOut[]>([]);
+  const [originPostOfficeId, setOriginPostOfficeId] = useState<number | "">("");
 
-  const [senderName, setSenderName] = useState("");
+  const [senderName, setSenderName] = useState(user?.full_name ?? "");
   const [recipientName, setRecipientName] = useState("");
   const [phone, setPhone] = useState("");
   const [preferredLanguage, setPreferredLanguage] =
@@ -66,6 +70,12 @@ function BookingForm() {
     listSlots()
       .then(setSlots)
       .catch(() => setSlots([]));
+    listPostOffices()
+      .then((pos) => {
+        setPostOffices(pos);
+        if (pos.length > 0) setOriginPostOfficeId(pos[0].id);
+      })
+      .catch(() => setPostOffices([]));
   }, []);
 
   const shareLink =
@@ -97,6 +107,8 @@ function BookingForm() {
     const body: ConsignmentCreate = {
       sender_id: null,
       sender_name: senderName.trim() || null,
+      origin_post_office_id:
+        typeof originPostOfficeId === "number" ? originPostOfficeId : null,
       recipient: {
         name: recipientName.trim(),
         phone: phone.trim(),
@@ -233,14 +245,29 @@ function BookingForm() {
           <legend className="section-title px-1">
             {t("consignmentNew.senderSection")}
           </legend>
-          <div className="mt-3">
+          <div className="mt-3 grid gap-4 sm:grid-cols-2">
             <Field
               label={t("consignmentNew.senderName")}
               required
               value={senderName}
               onChange={(e) => setSenderName(e.target.value)}
-              placeholder="Amazon Fulfilment"
+              placeholder="Sender / Company Name"
             />
+            <SelectField
+              label="Drop-off Post Office Counter"
+              value={originPostOfficeId}
+              onChange={(e) =>
+                setOriginPostOfficeId(
+                  e.target.value ? Number(e.target.value) : ""
+                )
+              }
+            >
+              {postOffices.map((po) => (
+                <option key={po.id} value={po.id}>
+                  {po.code} · {po.name} ({po.pincode})
+                </option>
+              ))}
+            </SelectField>
           </div>
         </fieldset>
 

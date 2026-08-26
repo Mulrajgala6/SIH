@@ -17,11 +17,14 @@ class Role(str, enum.Enum):
 
 
 class ConsignmentStatus(str, enum.Enum):
-    """Delivery status vocabulary (matches the UI/UX spec, §11)."""
+    """Delivery status vocabulary."""
 
     BOOKED = "BOOKED"
+    RECEIVED_AT_ORIGIN = "RECEIVED_AT_ORIGIN"
     COLLECTED = "COLLECTED"
     SORTED = "SORTED"
+    IN_TRANSIT = "IN_TRANSIT"
+    RECEIVED_AT_DESTINATION = "RECEIVED_AT_DESTINATION"
     SLOT_PENDING = "SLOT_PENDING"
     SLOT_CONFIRMED = "SLOT_CONFIRMED"
     OUT_FOR_DELIVERY = "OUT_FOR_DELIVERY"

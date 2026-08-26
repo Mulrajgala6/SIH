@@ -62,8 +62,9 @@ RNG = random.Random(4242)  # deterministic demo data
 # --------------------------------------------------------------------------- #
 # Static demo reference data
 # --------------------------------------------------------------------------- #
-# Approximate coordinates for Nashik localities (lat, lng).
+# Approximate coordinates for localities (lat, lng).
 LOCALITIES: dict[str, tuple[float, float]] = {
+    # Nashik region
     "Panchavati": (20.0110, 73.7929),
     "College Road": (19.9975, 73.7570),
     "Gangapur Road": (20.0050, 73.7500),
@@ -76,6 +77,13 @@ LOCALITIES: dict[str, tuple[float, float]] = {
     "Deolali": (19.9440, 73.8300),
     "Nashik Road": (19.9450, 73.8380),
     "Old Nashik": (19.9930, 73.7960),
+    # Mumbai region
+    "Fort / GPO": (18.9390, 72.8355),
+    "Bandra": (19.0596, 72.8295),
+    "Andheri": (19.1136, 72.8697),
+    # Pune region
+    "Shivajinagar": (18.5314, 73.8446),
+    "Kothrud": (18.5074, 73.8077),
 }
 
 # code -> (label_en, label_hi, start_minutes, end_minutes, sort_order)
@@ -90,6 +98,8 @@ SLOTS: dict[SlotCode, tuple[str, str, int, int, int]] = {
 POST_OFFICES = [
     ("NSK-HO", "Nashik City Head Post Office", "422001", 19.9975, 73.7898),
     ("NSK-RD", "Nashik Road Post Office", "422101", 19.9450, 73.8380),
+    ("BOM-GPO", "Mumbai General Post Office", "400001", 18.9400, 72.8350),
+    ("PUN-HO", "Pune Head Post Office", "411001", 18.5204, 73.8567),
 ]
 
 # Which post office serves which locality.
@@ -97,6 +107,11 @@ PO_FOR_LOCALITY = {
     "Deolali": "NSK-RD",
     "Nashik Road": "NSK-RD",
     "Adgaon": "NSK-RD",
+    "Fort / GPO": "BOM-GPO",
+    "Bandra": "BOM-GPO",
+    "Andheri": "BOM-GPO",
+    "Shivajinagar": "PUN-HO",
+    "Kothrud": "PUN-HO",
 }
 DEFAULT_PO = "NSK-HO"
 
@@ -130,6 +145,10 @@ RECIPIENTS = [
     ("Anjali Nair", "Gangapur Road", "en", "COLDSTART"),
     ("Farhan Shaikh", "Indira Nagar", "hi", "COLDSTART"),
     ("Meera Kulkarni", "Govind Nagar", "en", "AFTERNOON_PERSON"),
+    # Mumbai & Pune recipients
+    ("Rajesh Mehra", "Bandra", "en", "MORNING_PERSON"),
+    ("Shreya Bhatt", "Andheri", "en", "EVENING_PERSON"),
+    ("Nitin Gadgil", "Shivajinagar", "hi", "AFTERNOON_PERSON"),
 ]
 
 # sender: (name, organization)
@@ -147,6 +166,9 @@ AGENTS = [
     ("Suresh Patil", "postman2@daksync.in", "NSK-HO"),
     ("Ganesh Jadhav", "postman3@daksync.in", "NSK-HO"),
     ("Dinesh More", "postman4@daksync.in", "NSK-RD"),
+    ("Vikram Shinde", "postman5@daksync.in", "BOM-GPO"),
+    ("Sachin Sawant", "postman6@daksync.in", "BOM-GPO"),
+    ("Pravin Joshi", "postman7@daksync.in", "PUN-HO"),
 ]
 
 PARCEL_DESCRIPTIONS = [
@@ -200,7 +222,7 @@ def seed(verbose: bool = True) -> dict[str, int]:
         db.flush()
         counts["post_offices"] = len(offices)
 
-        # -- Staff users + agents ----------------------------------------- #
+        # -- Staff & Customer users + agents ------------------------------- #
         db.add(User(
             email="admin@daksync.in", hashed_password=hash_password("admin123"),
             full_name="System Admin", role=Role.ADMIN, phone=_phone(),
@@ -208,6 +230,14 @@ def seed(verbose: bool = True) -> dict[str, int]:
         db.add(User(
             email="supervisor@daksync.in", hashed_password=hash_password("super123"),
             full_name="Nashik Supervisor", role=Role.SUPERVISOR, phone=_phone(),
+        ))
+        db.add(User(
+            email="sender@daksync.in", hashed_password=hash_password("user123"),
+            full_name="Rahul Verma", role=Role.SENDER, phone="9820011223",
+        ))
+        db.add(User(
+            email="recipient@daksync.in", hashed_password=hash_password("user123"),
+            full_name="Aarti Deshmukh", role=Role.RECIPIENT, phone="9812345601",
         ))
         agents: list[DeliveryAgent] = []
         for full_name, email, po_code in AGENTS:
@@ -224,7 +254,7 @@ def seed(verbose: bool = True) -> dict[str, int]:
             db.add(agent)
             agents.append(agent)
         db.flush()
-        counts["users"] = 2 + len(AGENTS)
+        counts["users"] = 4 + len(AGENTS)
         counts["agents"] = len(agents)
 
         # -- Senders ------------------------------------------------------- #
@@ -240,7 +270,8 @@ def seed(verbose: bool = True) -> dict[str, int]:
         recipients: list[tuple[Recipient, Address, str]] = []
         for name, locality, lang, archetype in RECIPIENTS:
             r = Recipient(
-                name=name, phone=_phone(), preferred_language=lang,
+                name=name, phone="9812345601" if name == "Aarti Deshmukh" else _phone(),
+                preferred_language=lang,
                 behaviour_note=archetype,
             )
             db.add(r)
@@ -253,6 +284,7 @@ def seed(verbose: bool = True) -> dict[str, int]:
                 line2=RNG.choice(["Near Bus Stop", "Opp. Temple", "2nd Lane", "Main Road"]),
                 locality=locality, pincode=offices[po_code].pincode,
                 latitude=lat, longitude=lng, is_geocoded=True,
+                city="Mumbai" if po_code == "BOM-GPO" else ("Pune" if po_code == "PUN-HO" else "Nashik"),
             )
             db.add(addr)
             db.flush()
@@ -283,6 +315,7 @@ def seed(verbose: bool = True) -> dict[str, int]:
                     sender_id=RNG.choice(senders).id,
                     recipient_id=r.id, address_id=addr.id,
                     post_office_id=offices[po_code].id,
+                    origin_post_office_id=offices[DEFAULT_PO].id,
                     status=ConsignmentStatus.DELIVERED if success
                     else ConsignmentStatus.DELIVERY_FAILED,
                     priority=Priority.NORMAL,
@@ -329,6 +362,7 @@ def seed(verbose: bool = True) -> dict[str, int]:
                 tracking_number=generate_tracking_number(tracking_seq),
                 sender_id=sender.id, recipient_id=r.id, address_id=addr.id,
                 post_office_id=offices[po_code].id,
+                origin_post_office_id=offices["NSK-HO"].id,
                 priority=RNG.choices([Priority.NORMAL, Priority.HIGH, Priority.URGENT],
                                      weights=[7, 2, 1])[0],
                 description=RNG.choice(PARCEL_DESCRIPTIONS),
@@ -336,6 +370,26 @@ def seed(verbose: bool = True) -> dict[str, int]:
                 delivery_date=today,
             )
             tracking_seq += 1
+
+            # Inter-region parcels for Mumbai/Pune
+            if po_code in ("BOM-GPO", "PUN-HO"):
+                if idx % 2 == 0:
+                    # BOOKED at origin (Nashik), ready to be clubbed
+                    cons = Consignment(
+                        **base, status=ConsignmentStatus.BOOKED,
+                    )
+                    db.add(cons)
+                    db.flush()
+                else:
+                    # IN_TRANSIT in transit bag
+                    cons = Consignment(
+                        **base, status=ConsignmentStatus.IN_TRANSIT,
+                        bag_number=f"BAG-NSK-{po_code[:3]}-8821",
+                    )
+                    db.add(cons)
+                    db.flush()
+                active_count += 1
+                continue
 
             if idx in pending_indices or preferred is None:
                 # Awaiting recipient's slot choice / recommendation.

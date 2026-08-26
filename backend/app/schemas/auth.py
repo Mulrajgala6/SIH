@@ -22,6 +22,14 @@ class LoginRequest(BaseModel):
     password: str
 
 
+class UserRegisterRequest(BaseModel):
+    email: EmailStr
+    password: str
+    full_name: str
+    phone: str | None = None
+    role: Role = Role.SENDER  # Defaults to customer/sender
+
+
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
