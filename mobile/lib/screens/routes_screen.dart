@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../config.dart';
 import '../models/models.dart';
+import '../services/map_launcher.dart';
 import '../state/app_state.dart';
 import '../widgets/status_chip.dart';
 import 'login_screen.dart';
@@ -37,16 +38,19 @@ class _RoutesScreenState extends State<RoutesScreen> {
   Widget build(BuildContext context) {
     final state = context.watch<AppState>();
     final routes = state.routes;
+    final user = state.user;
 
     return Scaffold(
       appBar: AppBar(
         title: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('My routes'),
-            if (state.user != null)
-              Text(state.user!.fullName,
-                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.normal)),
+            const Text('My Delivery Run Sheets'),
+            if (user != null)
+              Text(
+                '${user.fullName} · ${user.postOffice?.name ?? "Regional Beat"}',
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.normal),
+              ),
           ],
         ),
         actions: [
@@ -75,10 +79,37 @@ class _RoutesScreenState extends State<RoutesScreen> {
             if (routes.isEmpty) {
               return _EmptyState();
             }
-            return ListView.builder(
+            return ListView(
               padding: const EdgeInsets.all(16),
-              itemCount: routes.length,
-              itemBuilder: (context, i) => _RouteCard(route: routes[i]),
+              children: [
+                if (user?.postOffice != null)
+                  Container(
+                    margin: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFEFF6FF),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: const Color(0xFFBFDBFE)),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.location_city, size: 18, color: Color(0xFF1D4ED8)),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Serving: ${user!.postOffice!.name} (${user.postOffice!.code}) · PIN ${user.postOffice!.pincode}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Color(0xFF1E40AF),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ...routes.map((r) => _RouteCard(route: r)),
+              ],
             );
           },
         ),
@@ -94,8 +125,12 @@ class _RouteCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final delivered = route.stops.where((s) => s.status == 'COMPLETED').length;
+    final pendingStops = route.stops.where((s) => s.status == 'PENDING').toList();
+    final nextStop = pendingStops.isNotEmpty ? pendingStops.first : null;
+
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
+      margin: const EdgeInsets.only(bottom: 14),
+      elevation: 2,
       child: InkWell(
         borderRadius: BorderRadius.circular(12),
         onTap: () => Navigator.of(context).push(
@@ -109,15 +144,32 @@ class _RouteCard extends StatelessWidget {
               Row(
                 children: [
                   Expanded(
-                    child: Text('Route #${route.id}',
-                        style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+                    child: Row(
+                      children: [
+                        Text('Route #${route.id}',
+                            style: const TextStyle(fontSize: 17, fontWeight: FontWeight.w700)),
+                        const SizedBox(width: 8),
+                        if (route.postOffice != null)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF1F5F9),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              route.postOffice!.code,
+                              style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFF475569)),
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
                   StatusChip(route.status),
                 ],
               ),
               const SizedBox(height: 4),
-              Text(route.agent?.name ?? 'Unassigned',
-                  style: const TextStyle(color: Color(0xFF475569))),
+              Text(route.agent?.name ?? 'Assigned Beat Postman',
+                  style: const TextStyle(color: Color(0xFF475569), fontSize: 13)),
               const SizedBox(height: 12),
               Row(
                 children: [
@@ -142,8 +194,39 @@ class _RouteCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 6),
-              Text('$delivered of ${route.totalStops} delivered',
-                  style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.between,
+                children: [
+                  Text('$delivered of ${route.totalStops} delivered',
+                      style: const TextStyle(fontSize: 12, color: Color(0xFF64748B))),
+                  if (nextStop != null &&
+                      nextStop.consignment.address.latitude != null &&
+                      nextStop.consignment.address.longitude != null)
+                    InkWell(
+                      onTap: () {
+                        MapLauncher.openTurnByTurn(
+                          nextStop.consignment.address.latitude!,
+                          nextStop.consignment.address.longitude!,
+                          label: nextStop.consignment.recipient.name,
+                        );
+                      },
+                      child: const Row(
+                        children: [
+                          Icon(Icons.directions_bike, size: 14, color: Color(0xFF0284C7)),
+                          SizedBox(width: 4),
+                          Text(
+                            'Navigate Next',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF0284C7),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
+              ),
             ],
           ),
         ),

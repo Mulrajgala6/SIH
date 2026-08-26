@@ -2,12 +2,41 @@
 /// docs/API_CONTRACT.md; `fromJson` factories parse the backend payloads.
 library;
 
+class PostOfficeBrief {
+  final int id;
+  final String code;
+  final String name;
+  final String pincode;
+  final double latitude;
+  final double longitude;
+
+  PostOfficeBrief({
+    required this.id,
+    required this.code,
+    required this.name,
+    required this.pincode,
+    required this.latitude,
+    required this.longitude,
+  });
+
+  factory PostOfficeBrief.fromJson(Map<String, dynamic> j) => PostOfficeBrief(
+        id: j['id'] as int,
+        code: j['code'] as String? ?? '',
+        name: j['name'] as String? ?? '',
+        pincode: j['pincode'] as String? ?? '',
+        latitude: (j['latitude'] as num?)?.toDouble() ?? 0.0,
+        longitude: (j['longitude'] as num?)?.toDouble() ?? 0.0,
+      );
+}
+
 class AuthUser {
   final int id;
   final String email;
   final String fullName;
   final String role;
   final String? phone;
+  final int? postOfficeId;
+  final PostOfficeBrief? postOffice;
 
   AuthUser({
     required this.id,
@@ -15,6 +44,8 @@ class AuthUser {
     required this.fullName,
     required this.role,
     this.phone,
+    this.postOfficeId,
+    this.postOffice,
   });
 
   factory AuthUser.fromJson(Map<String, dynamic> j) => AuthUser(
@@ -23,6 +54,10 @@ class AuthUser {
         fullName: j['full_name'] as String? ?? '',
         role: j['role'] as String? ?? '',
         phone: j['phone'] as String?,
+        postOfficeId: j['post_office_id'] as int?,
+        postOffice: j['post_office'] == null
+            ? null
+            : PostOfficeBrief.fromJson(j['post_office'] as Map<String, dynamic>),
       );
 }
 
@@ -206,6 +241,7 @@ class RouteStop {
 class DeliveryRoute {
   final int id;
   final int postOfficeId;
+  final PostOfficeBrief? postOffice;
   final AgentBrief? agent;
   final String routeDate;
   final String status;
@@ -218,6 +254,7 @@ class DeliveryRoute {
   DeliveryRoute({
     required this.id,
     required this.postOfficeId,
+    this.postOffice,
     required this.agent,
     required this.routeDate,
     required this.status,
@@ -231,6 +268,9 @@ class DeliveryRoute {
   factory DeliveryRoute.fromJson(Map<String, dynamic> j) => DeliveryRoute(
         id: j['id'] as int,
         postOfficeId: j['post_office_id'] as int? ?? 0,
+        postOffice: j['post_office'] == null
+            ? null
+            : PostOfficeBrief.fromJson(j['post_office'] as Map<String, dynamic>),
         agent: j['agent'] == null ? null : AgentBrief.fromJson(j['agent'] as Map<String, dynamic>),
         routeDate: j['route_date'] as String? ?? '',
         status: j['status'] as String? ?? 'PLANNED',

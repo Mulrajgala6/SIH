@@ -1,80 +1,57 @@
 # DAKSYNC — Postman Field App (Flutter)
 
-The postman-facing half of DAKSYNC. A postman signs in, sees the routes assigned
-to them for the day (ordered stops with ETAs and confirmed delivery slots), and
-works each stop through an OTP-verified delivery flow.
+The postman-facing mobile app of DAKSYNC for India Post. A postman signs in to their regional beat, views today's AI-optimized delivery run sheet, follows GPS map navigation to each delivery address, and completes verified handovers via OTP.
 
-This app talks to the same FastAPI backend as the web console — see
-`../docs/API_CONTRACT.md` for the endpoints it uses (`/auth/login`, `/routes`,
-`/routes/{id}`, `/deliveries/*`).
+---
 
-## What it does
+## Key Features
 
-- **Sign in** as a postman (role-guarded token from `/auth/login`).
-- **My routes** — today's run sheets, with stop count, distance, planned start,
-  and a delivered/total progress bar. Pull to refresh.
-- **Route detail** — the ordered stops (run sheet): sequence, recipient, address,
-  ETA, confirmed slot (bilingual, e.g. "Evening · शाम"), and per-stop status.
-- **Delivery flow** — per stop: **Start delivery** → the backend mints a
-  one-time password; in demo mode it's shown on-screen in a highlighted
-  *"Demo OTP (shown for presentation)"* card so you can present without a real
-  SMS gateway. Enter the OTP → **Verify** (shows attempts remaining on a wrong
-  code) → **Complete delivery**. A **Mark as failed** path captures a reason
-  (recipient unavailable / wrong address / refused / other) and optional notes.
+1. **Multi-Region & Regional Beat Access**:
+   - Supports postmen across all 6 postal hubs (`NSK-HO`, `NSK-RD`, `BOM-GPO`, `BOM-AND`, `PUN-HO`, `NGP-GPO`).
+   - 1-tap regional login selector on the sign-in screen.
+   - Header displays the postman's assigned regional office and serving PIN code.
 
-The OTP is validated server-side (expiry + single-use); the app never sees the
-stored hash and never decides verification itself.
+2. **GPS Map Navigation & Next Delivery Routing**:
+   - **Next Delivery Action Card**: Prominently highlights the immediate next delivery stop, ETA, recipient phone, and confirmed delivery window.
+   - **1-Click GPS Navigation**: Directly launches Google Maps / Navigation app with two-wheeler turn-by-turn routing to the recipient's coordinates.
+   - **Interactive Route Map View**: Modal route viewer displaying all sequenced stops in order with distances and timeline.
+   - **Multi-Stop Turn-by-Turn**: Postman can open the entire day's run sheet in Google Maps with all waypoints preloaded.
 
-## Run it
+3. **OTP-Verified Delivery Flow**:
+   - **Start Delivery**: Sends SMS/In-app OTP to the customer and switches status to `OUT_FOR_DELIVERY`.
+   - **Demo OTP Presentation**: In demo mode, OTP is displayed on screen for live evaluation and judging.
+   - **Verification & Handover**: Enforces 4-digit code verification with attempt limits before marking as `DELIVERED`.
+   - **Exception Handling**: Postman can record delivery failures with standard India Post failure codes (`RECIPIENT_UNAVAILABLE`, `DOOR_LOCKED`, `WRONG_ADDRESS`, etc.).
 
-Prerequisites: Flutter SDK (3.x), and the DAKSYNC backend running (default
-`http://localhost:8000`).
+---
+
+## Demo Postmen Accounts (Password: `post123`)
+
+| Region / Hub | Postman Name | Email |
+| :--- | :--- | :--- |
+| **Nashik City HO** | Ramesh Gaikwad | `postman1@daksync.in` |
+| **Nashik Road** | Dinesh More | `postman4@daksync.in` |
+| **Mumbai GPO** | Vikram Shinde | `postman6@daksync.in` |
+| **Mumbai Andheri HO** | Pradeep Kadam | `postman8@daksync.in` |
+| **Pune Head Post Office** | Pravin Joshi | `postman10@daksync.in` |
+| **Nagpur General Post Office** | Anand Raut | `postman12@daksync.in` |
+
+*(All 14 postmen `postman1@daksync.in` through `postman14@daksync.in` share the password `post123`)*
+
+---
+
+## Running the App
 
 ```bash
 cd mobile
 flutter pub get
 
-# Flutter web (simplest for a laptop demo — backend on the same machine):
+# Web mode (simplest for browser demo):
 flutter run -d chrome
 
-# Android emulator (localhost on the host is 10.0.2.2 from inside the emulator):
+# Android Emulator:
 flutter run --dart-define=API_BASE=http://10.0.2.2:8000
 
-# A physical device on the same Wi-Fi (use your laptop's LAN IP):
-flutter run --dart-define=API_BASE=http://192.168.1.50:8000
+# Physical Device on local Wi-Fi:
+flutter run --dart-define=API_BASE=http://<YOUR_IP>:8000
 ```
-
-The API base URL is a compile-time define (`API_BASE`), defaulting to
-`http://localhost:8000`. The `/api/v1` prefix is fixed in `lib/config.dart`.
-
-## Demo login
-
-```
-postman1@daksync.in · post123   (postman1 … postman4)
-```
-
-Routes only appear once a supervisor has optimized routes for the day in the web
-console, so the delivery loop is: seed data → supervisor optimizes → postman
-delivers here.
-
-## Project layout
-
-```
-lib/
-  config.dart              API base URL + time formatting
-  main.dart                MaterialApp (Material 3, India Post blue) + provider
-  models/models.dart       response models (mirror API_CONTRACT.md)
-  services/api_client.dart REST client + ApiException
-  state/app_state.dart     auth + routes (ChangeNotifier)
-  screens/
-    login_screen.dart
-    routes_screen.dart      today's routes
-    route_detail_screen.dart ordered stops
-    delivery_screen.dart    start → OTP → complete / fail
-  widgets/
-    primary_button.dart
-    status_chip.dart
-    otp_input.dart
-```
-
-Dependencies are deliberately minimal: `http` and `provider` only.

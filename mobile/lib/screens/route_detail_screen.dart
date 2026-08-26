@@ -4,7 +4,9 @@ import 'package:provider/provider.dart';
 import '../config.dart';
 import '../models/models.dart';
 import '../services/api_client.dart';
+import '../services/map_launcher.dart';
 import '../state/app_state.dart';
+import '../widgets/route_map_view.dart';
 import '../widgets/status_chip.dart';
 import 'delivery_screen.dart';
 
@@ -63,6 +65,20 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
     if (changed == true) _load();
   }
 
+  void _showRouteMapModal(BuildContext context, DeliveryRoute route) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => DraggableScrollableSheet(
+        initialChildSize: 0.85,
+        minChildSize: 0.5,
+        maxChildSize: 0.95,
+        builder: (_, scrollController) => RouteMapView(route: route),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final route = _route;
@@ -74,7 +90,7 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
             IconButton(
               icon: const Icon(Icons.map_outlined),
               tooltip: 'View Route Map',
-              onPressed: () => _showRouteMapDialog(context, route),
+              onPressed: () => _showRouteMapModal(context, route),
             ),
           IconButton(icon: const Icon(Icons.refresh), onPressed: _load),
         ],
@@ -101,131 +117,247 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
     );
   }
 
-  void _showRouteMapDialog(BuildContext context, DeliveryRoute route) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Row(
-          children: [
-            const Icon(Icons.map, color: Color(0xFF0369A1)),
-            const SizedBox(width: 8),
-            Text('Route #${route.id} Map'),
-          ],
-        ),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF1F5F9),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.apartment, color: Color(0xFF991B1B), size: 20),
-                    const SizedBox(width: 8),
-                    const Expanded(
-                      child: Text(
-                        'Depot: Nashik HO (NSK-HO)',
-                        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-                      ),
-                    ),
-                    Text(
-                      '${route.totalDistanceKm.toStringAsFixed(1)} km',
-                      style: const TextStyle(fontSize: 12, color: Color(0xFF475569)),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-              const Text('Sequenced Stops & Coordinates:',
-                  style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
-              const SizedBox(height: 8),
-              Flexible(
-                child: ListView.separated(
-                  shrinkWrap: true,
-                  itemCount: route.stops.length,
-                  separatorBuilder: (_, __) => const Divider(height: 1),
-                  itemBuilder: (ctx, i) {
-                    final s = route.stops[i];
-                    final c = s.consignment;
-                    final lat = c.address.latitude;
-                    final lng = c.address.longitude;
-                    return ListTile(
-                      dense: true,
-                      contentPadding: EdgeInsets.zero,
-                      leading: CircleAvatar(
-                        radius: 12,
-                        backgroundColor: const Color(0xFF0369A1),
-                        child: Text('${s.sequence}',
-                            style: const TextStyle(color: Colors.white, fontSize: 11)),
-                      ),
-                      title: Text(c.recipient.name,
-                          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13)),
-                      subtitle: Text(
-                        '${c.address.locality} · ${lat != null && lng != null ? "${lat.toStringAsFixed(3)}, ${lng.toStringAsFixed(3)}" : "Geocoded"}\nETA ${minutesToLabel(s.etaMinutes)}',
-                        style: const TextStyle(fontSize: 11),
-                      ),
-                      trailing: StatusChip(s.status),
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(),
-            child: const Text('Close'),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildBody(DeliveryRoute route) {
+    final pendingStops = route.stops.where((s) => s.status == 'PENDING').toList();
+    final nextStop = pendingStops.isNotEmpty ? pendingStops.first : null;
+    final depotName = route.postOffice != null
+        ? '${route.postOffice!.name} (${route.postOffice!.code})'
+        : 'Assigned Regional Office';
+
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        // Depot & Route summary header
         Card(
+          elevation: 2,
           child: Padding(
             padding: const EdgeInsets.all(16),
-            child: Row(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(route.agent?.name ?? 'Unassigned',
-                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${route.totalStops} stops · ${route.totalDistanceKm.toStringAsFixed(1)} km · '
-                        'start ${minutesToLabel(route.plannedStartMinutes)}',
-                        style: const TextStyle(color: Color(0xFF475569), fontSize: 13),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.between,
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(route.agent?.name ?? 'Assigned Beat Postman',
+                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 16)),
+                          const SizedBox(height: 2),
+                          Row(
+                            children: [
+                              const Icon(Icons.location_city, size: 14, color: Color(0xFF64748B)),
+                              const SizedBox(width: 4),
+                              Expanded(
+                                child: Text(
+                                  depotName,
+                                  style: const TextStyle(fontSize: 12, color: Color(0xFF475569)),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
                       ),
-                      if (route.optimizer != null)
-                        Padding(
-                          padding: const EdgeInsets.only(top: 4),
-                          child: Text('optimizer: ${route.optimizer}',
-                              style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 12)),
-                        ),
-                    ],
-                  ),
+                    ),
+                    StatusChip(route.status),
+                  ],
                 ),
-                StatusChip(route.status),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    _InfoBadge(
+                      icon: Icons.location_on_outlined,
+                      label: '${route.totalStops} stops',
+                    ),
+                    const SizedBox(width: 10),
+                    _InfoBadge(
+                      icon: Icons.route_outlined,
+                      label: '${route.totalDistanceKm.toStringAsFixed(1)} km',
+                    ),
+                    const SizedBox(width: 10),
+                    _InfoBadge(
+                      icon: Icons.schedule,
+                      label: 'Start ${minutesToLabel(route.plannedStartMinutes)}',
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                // Route Map Action Button
+                OutlinedButton.icon(
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF0284C7),
+                    side: const BorderBorder(color: Color(0xFFBAE6FD)),
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  ),
+                  icon: const Icon(Icons.map, size: 18),
+                  label: const Text('View Full Sequenced Route on Map'),
+                  onPressed: () => _showRouteMapModal(context, route),
+                ),
               ],
             ),
           ),
         ),
+        const SizedBox(height: 14),
+
+        // --- NEXT DELIVERY ACTION CARD ---
+        if (nextStop != null) ...[
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF0369A1), Color(0xFF0284C7)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+              borderRadius: BorderRadius.circular(14),
+              boxShadow: [
+                BoxShadow(
+                  color: const Color(0xFF0284C7).withOpacity(0.3),
+                  blurRadius: 10,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.between,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Text(
+                        '⚡ NEXT STOP #${nextStop.sequence}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 11,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ),
+                    Text(
+                      'ETA ${minutesToLabel(nextStop.etaMinutes)}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Text(
+                  nextStop.consignment.recipient.name,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 18,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  nextStop.consignment.address.oneLine,
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.9),
+                    fontSize: 13,
+                  ),
+                ),
+                if (nextStop.consignment.confirmedSlot != null) ...[
+                  const SizedBox(height: 6),
+                  Text(
+                    '⏰ Confirmed Window: ${nextStop.consignment.confirmedSlot!.bilingualLabel}',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.95),
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    // Start GPS Navigation
+                    if (nextStop.consignment.address.latitude != null &&
+                        nextStop.consignment.address.longitude != null)
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            foregroundColor: const Color(0xFF0369A1),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                          ),
+                          icon: const Icon(Icons.directions_bike, size: 18),
+                          label: const Text('Start GPS Navigation'),
+                          onPressed: () {
+                            MapLauncher.openTurnByTurn(
+                              nextStop.consignment.address.latitude!,
+                              nextStop.consignment.address.longitude!,
+                              label: nextStop.consignment.recipient.name,
+                            );
+                          },
+                        ),
+                      ),
+                    const SizedBox(width: 8),
+                    // Deliver
+                    ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF16A34A),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                        textStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                      ),
+                      icon: const Icon(Icons.verified, size: 16),
+                      label: const Text('Deliver'),
+                      onPressed: () => _openStop(nextStop),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
+
+        const Text(
+          'All Sequenced Stops',
+          style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFF1E293B)),
+        ),
         const SizedBox(height: 8),
         ...route.stops.map((s) => _StopTile(stop: s, onTap: () => _openStop(s))),
       ],
+    );
+  }
+}
+
+class _InfoBadge extends StatelessWidget {
+  final IconData icon;
+  final String label;
+
+  const _InfoBadge({required this.icon, required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F5F9),
+        borderRadius: BorderRadius.circular(6),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14, color: const Color(0xFF475569)),
+          const SizedBox(width: 4),
+          Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFF334155))),
+        ],
+      ),
     );
   }
 }
@@ -240,6 +372,7 @@ class _StopTile extends StatelessWidget {
     final c = stop.consignment;
     final scheme = Theme.of(context).colorScheme;
     final hasCoords = c.address.latitude != null && c.address.longitude != null;
+    final isCompleted = stop.status == 'COMPLETED';
 
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
@@ -253,9 +386,17 @@ class _StopTile extends StatelessWidget {
             children: [
               CircleAvatar(
                 radius: 16,
-                backgroundColor: scheme.primary,
-                child: Text('${stop.sequence}',
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                backgroundColor: isCompleted
+                    ? const Color(0xFF16A34A)
+                    : stop.status == 'FAILED'
+                        ? const Color(0xFFDC2626)
+                        : scheme.primary,
+                child: isCompleted
+                    ? const Icon(Icons.check, color: Colors.white, size: 16)
+                    : Text(
+                        '${stop.sequence}',
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                      ),
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -265,8 +406,14 @@ class _StopTile extends StatelessWidget {
                     Row(
                       children: [
                         Expanded(
-                          child: Text(c.recipient.name,
-                              style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                          child: Text(
+                            c.recipient.name,
+                            style: TextStyle(
+                              fontWeight: FontWeight.w700,
+                              fontSize: 15,
+                              decoration: isCompleted ? TextDecoration.lineThrough : null,
+                            ),
+                          ),
                         ),
                         Text('ETA ${minutesToLabel(stop.etaMinutes)}',
                             style: TextStyle(color: scheme.primary, fontWeight: FontWeight.w600)),
@@ -291,24 +438,6 @@ class _StopTile extends StatelessWidget {
                           const SizedBox(width: 8),
                         ],
                         StatusChip(stop.status),
-                        if (hasCoords) ...[
-                          const SizedBox(width: 6),
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: const Color(0xFFE0F2FE),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: const Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.navigation, size: 10, color: Color(0xFF0284C7)),
-                                SizedBox(width: 2),
-                                Text('GPS', style: TextStyle(fontSize: 10, color: Color(0xFF0284C7), fontWeight: FontWeight.bold)),
-                              ],
-                            ),
-                          ),
-                        ],
                       ],
                     ),
                     const SizedBox(height: 4),
@@ -317,7 +446,20 @@ class _StopTile extends StatelessWidget {
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right, color: Color(0xFF94A3B8)),
+              if (hasCoords)
+                IconButton(
+                  tooltip: 'Navigate',
+                  icon: const Icon(Icons.navigation, color: Color(0xFF0284C7), size: 22),
+                  onPressed: () {
+                    MapLauncher.openTurnByTurn(
+                      c.address.latitude!,
+                      c.address.longitude!,
+                      label: c.recipient.name,
+                    );
+                  },
+                )
+              else
+                const Icon(Icons.chevron_right, color: Color(0xFF94A3B8)),
             ],
           ),
         ),
