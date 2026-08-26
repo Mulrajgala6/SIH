@@ -15,7 +15,8 @@ python-multipart>=0.0.9
 
 # --- Data / ORM / config ---
 SQLAlchemy>=2.0,<2.1
-pydantic>=2.9,<3.0
+pydantic[email]>=2.9,<3.0
+email-validator>=2.0.0
 pydantic-settings>=2.4,<3.0
 python-dotenv>=1.0,<2.0
 

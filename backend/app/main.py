@@ -36,6 +36,7 @@ app.add_middleware(
             settings.frontend_origin,
             "http://localhost:3000",
             "http://127.0.0.1:3000",
+            "*"
         }
     ),
     allow_credentials=True,
