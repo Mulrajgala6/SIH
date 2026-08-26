@@ -1,0 +1,27 @@
+# ── DAKSYNC optional extras ────────────────────────────────────────────────
+# NONE of these are required. Every one is imported lazily, and the backend
+# degrades gracefully when it is missing — so the app runs fully on the core
+# requirements.txt alone. Install any subset to get the upgrade described:
+#
+#   pip install -r requirements-optional.txt
+#
+# (Listed with pinned-compatible ranges so a full install still resolves.)
+
+# Route optimisation — Google OR-Tools VRPTW solver.
+# Without it: the built-in nearest-neighbour + 2-opt optimiser is used instead
+# (app/services/routing.py falls back automatically).
+ortools>=9.10,<10.0
+
+# Online geocoding — HTTP client for the Nominatim fallback.
+# Without it: only the seeded offline Nashik centroids are used
+# (app/services/geocoding.py skips the online path).
+httpx>=0.27,<0.29
+
+# Pre-trained slot model — load a serialised model artifact (model.joblib) if
+# one is present. Without it: the history-based Bayesian scorer is used
+# (app/ml/recommender.py; this is the default and needs nothing).
+joblib>=1.3,<2.0
+
+# PostgreSQL driver — only needed if DATABASE_URL points at PostgreSQL.
+# Without it: the zero-config SQLite default is used.
+psycopg2-binary>=2.9,<3.0

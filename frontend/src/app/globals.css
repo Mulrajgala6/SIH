@@ -17,3 +17,43 @@ body {
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
+
+::selection {
+  background-color: #d8e6f4; /* brand-100 */
+  color: #182d49; /* brand-900 */
+}
+
+@layer components {
+  /* Shared surface + heading helpers used across pages. */
+  .card {
+    @apply rounded-xl border border-slate-200 bg-white shadow-sm;
+  }
+  .section-title {
+    @apply text-sm font-semibold uppercase tracking-wide text-slate-500;
+  }
+}
+
+@layer utilities {
+  /* Gentle, calm entrance — respects reduced-motion preferences. */
+  .animate-fade-in {
+    animation: daksync-fade-in 0.25s ease-out both;
+  }
+}
+
+@keyframes daksync-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in {
+    animation: none;
+  }
+}
+

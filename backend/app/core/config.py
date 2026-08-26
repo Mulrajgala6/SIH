@@ -23,6 +23,16 @@ class Settings(BaseSettings):
     api_v1_prefix: str = "/api/v1"
     debug: bool = True
 
+    # Demo mode surfaces conveniences for presentations (e.g. the OTP is
+    # returned in the API response instead of only via a real SMS gateway).
+    # Turn OFF in any non-demo deployment.
+    demo_mode: bool = True
+
+    # Secret used to sign lightweight bearer tokens (stdlib HMAC). Override in
+    # production via the DAKSYNC_SECRET_KEY / SECRET_KEY env var.
+    secret_key: str = "daksync-dev-secret-change-me"
+    token_ttl_seconds: int = 60 * 60 * 12  # 12h
+
     # --- Database ---
     # Default: zero-config SQLite (runs with no external services).
     # Recommended: PostgreSQL, e.g.
@@ -37,8 +47,9 @@ class Settings(BaseSettings):
     nominatim_user_agent: str = "daksync-prototype/0.1 (SIH2026)"
 
     # --- OTP (Phase 9) ---
-    otp_ttl_seconds: int = 600  # 10 minutes
+    otp_ttl_seconds: int = 3600  # 1 hour (comfortable for a live demo; still expires)
     otp_length: int = 4
+    otp_max_attempts: int = 5
 
 
 @lru_cache

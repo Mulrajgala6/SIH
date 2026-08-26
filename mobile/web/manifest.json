@@ -1,0 +1,12 @@
+{
+  "name": "DAKSYNC Postman",
+  "short_name": "DAKSYNC",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#F7F9FC",
+  "theme_color": "#254F87",
+  "description": "DAKSYNC postman field app — routes and OTP-verified delivery.",
+  "orientation": "portrait-primary",
+  "prefer_related_applications": false,
+  "icons": []
+}

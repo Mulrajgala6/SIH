@@ -1,35 +1,23 @@
 # ── DAKSYNC backend dependencies ───────────────────────────────────────────
-# Install:  pip install -r requirements.txt
-# SQLite works out of the box (no driver needed). psycopg2-binary is only
-# required when DATABASE_URL points at PostgreSQL.
+# Install the core (everything runs on this — SQLite, Bayesian slot
+# recommender, built-in route optimiser, seeded offline geocoding):
+#
+#   pip install -r requirements.txt
+#
+# The extras in requirements-optional.txt are genuinely optional: each is
+# imported lazily and the app falls back gracefully when it is absent. Install
+# them only if you want the upgrade they provide (see that file for details).
 
-# Web framework
+# --- Web framework ---
 fastapi>=0.115,<0.116
 uvicorn[standard]>=0.30,<0.32
 python-multipart>=0.0.9
 
-# Data / ORM
+# --- Data / ORM / config ---
 SQLAlchemy>=2.0,<2.1
 pydantic>=2.9,<3.0
 pydantic-settings>=2.4,<3.0
 python-dotenv>=1.0,<2.0
-alembic>=1.13,<2.0
 
-# PostgreSQL driver (recommended DB; SQLite fallback needs nothing extra)
-psycopg2-binary>=2.9,<3.0
-
-# Geocoding (Phase 5)
-httpx>=0.27,<0.29
-
-# Machine learning — slot recommendation (Phase 4)
-scikit-learn>=1.4,<2.0
-xgboost>=2.0,<3.0
-pandas>=2.1,<3.0
-numpy>=1.26,<3.0
-joblib>=1.3,<2.0
-
-# Route optimization (Phase 6)
-ortools>=9.10,<10.0
-
-# Testing
+# --- Testing ---
 pytest>=8.0,<9.0

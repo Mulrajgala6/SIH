@@ -1,13 +1,14 @@
 """DAKSYNC FastAPI application entry point.
 
-Phase 0 wires up the app, CORS and health checks. Feature routers
-(consignments, slots, routes, deliveries, analytics) are added in later phases.
+Wires up the app, CORS, health checks, and the full API v1 router
+(auth, consignments, slots, routes, deliveries, analytics).
 """
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
+from app.api.v1.router import api_router
 from app.core.config import settings
 from app.db.session import engine
 
@@ -66,3 +67,7 @@ def health() -> dict:
             "error": db_error,
         },
     }
+
+
+# Feature API (versioned).
+app.include_router(api_router, prefix=settings.api_v1_prefix)
