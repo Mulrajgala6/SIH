@@ -9,7 +9,7 @@ library;
 
 const String kApiBase = String.fromEnvironment(
   'API_BASE',
-  defaultValue: 'https://sih-production-8bdb.up.railway.app',
+  defaultValue: 'https://sih-bqm3.onrender.com',
 );
 
 /// Everything below `/api/v1`.
