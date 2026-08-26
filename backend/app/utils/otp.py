@@ -25,6 +25,10 @@ def expiry_from(now: datetime, ttl_seconds: int) -> datetime:
 
 
 def is_expired(expires_at: datetime, now: datetime) -> bool:
+    if expires_at.tzinfo is not None and now.tzinfo is None:
+        now = now.replace(tzinfo=expires_at.tzinfo)
+    elif expires_at.tzinfo is None and now.tzinfo is not None:
+        expires_at = expires_at.replace(tzinfo=now.tzinfo)
     return now >= expires_at
 
 

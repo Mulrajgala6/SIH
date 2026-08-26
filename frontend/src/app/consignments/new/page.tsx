@@ -7,6 +7,7 @@ import { RequireRole, useAuth } from "@/lib/auth";
 import { useI18n, pickLang } from "@/lib/i18n";
 import { Field, SelectField, TextareaField } from "@/components/Field";
 import { Button } from "@/components/Button";
+import { LocationPickerMap } from "@/components/LocationPickerMap";
 import {
   createConsignment,
   listSlots,
@@ -49,6 +50,8 @@ function BookingForm() {
   const [city, setCity] = useState("Nashik");
   const [stateName, setStateName] = useState("Maharashtra");
   const [pincode, setPincode] = useState("");
+  const [latitude, setLatitude] = useState<number | null>(null);
+  const [longitude, setLongitude] = useState<number | null>(null);
   const [description, setDescription] = useState("");
   const [weight, setWeight] = useState("");
   const [priority, setPriority] = useState<Priority>("NORMAL");
@@ -70,6 +73,22 @@ function BookingForm() {
       ? `${window.location.origin}/confirm/${result.id}`
       : "";
 
+  const handleMapLocationSelect = (loc: {
+    latitude: number;
+    longitude: number;
+    locality?: string;
+    city?: string;
+    state?: string;
+    pincode?: string;
+  }) => {
+    setLatitude(loc.latitude);
+    setLongitude(loc.longitude);
+    if (loc.locality) setLocality(loc.locality);
+    if (loc.city) setCity(loc.city);
+    if (loc.state) setStateName(loc.state);
+    if (loc.pincode) setPincode(loc.pincode);
+  };
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!token) return;
@@ -90,8 +109,8 @@ function BookingForm() {
         city: city.trim(),
         state: stateName.trim(),
         pincode: pincode.trim(),
-        latitude: null,
-        longitude: null,
+        latitude,
+        longitude,
       },
       description: description.trim() || null,
       weight_grams: weight.trim() ? Number(weight) : null,
@@ -264,6 +283,17 @@ function BookingForm() {
           <legend className="section-title px-1">
             {t("consignmentNew.addressSection")}
           </legend>
+
+          {/* Interactive Map Location Picker */}
+          <div className="mt-3 mb-5">
+            <LocationPickerMap
+              latitude={latitude}
+              longitude={longitude}
+              locality={locality}
+              onLocationSelect={handleMapLocationSelect}
+            />
+          </div>
+
           <div className="mt-3 grid gap-4 sm:grid-cols-2">
             <div className="sm:col-span-2">
               <Field

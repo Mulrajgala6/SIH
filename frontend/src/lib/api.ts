@@ -239,9 +239,19 @@ export interface RouteStopOut {
   consignment: ConsignmentBrief;
 }
 
+export interface PostOfficeBrief {
+  id: number;
+  code: string;
+  name: string;
+  pincode: string;
+  latitude: number;
+  longitude: number;
+}
+
 export interface RouteOut {
   id: number;
   post_office_id: number;
+  post_office?: PostOfficeBrief | null;
   agent: AgentBrief | null;
   route_date: string;
   status: RouteStatus;
@@ -603,6 +613,52 @@ export function getDashboard(
   return apiFetch<DashboardOut>(`/api/v1/analytics/dashboard${query}`, {
     token,
   });
+}
+
+/* ------------------------------------------------------------------ */
+/* Geocoding endpoints                                                */
+/* ------------------------------------------------------------------ */
+
+export interface LocalityPreset {
+  locality: string;
+  city: string;
+  state: string;
+  pincode: string;
+  latitude: number;
+  longitude: number;
+}
+
+export interface ReverseGeocodeOut {
+  locality: string;
+  city: string;
+  state: string;
+  pincode: string;
+  display_name: string;
+  latitude: number;
+  longitude: number;
+  source: string;
+}
+
+export interface ForwardGeocodeOut {
+  latitude: number;
+  longitude: number;
+  source: string;
+  is_geocoded: boolean;
+}
+
+export function reverseGeocode(lat: number, lng: number): Promise<ReverseGeocodeOut> {
+  return apiFetch<ReverseGeocodeOut>(
+    `/api/v1/geocoding/reverse?lat=${encodeURIComponent(lat)}&lng=${encodeURIComponent(lng)}`,
+  );
+}
+
+export function listLocalities(): Promise<LocalityPreset[]> {
+  return apiFetch<LocalityPreset[]>("/api/v1/geocoding/localities");
+}
+
+export function forwardGeocode(locality: string, city = "Nashik", pincode = ""): Promise<ForwardGeocodeOut> {
+  const query = buildQuery({ locality, city, pincode });
+  return apiFetch<ForwardGeocodeOut>(`/api/v1/geocoding/forward${query}`);
 }
 
 /* ------------------------------------------------------------------ */

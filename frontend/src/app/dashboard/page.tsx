@@ -10,6 +10,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/Button";
 import { Spinner } from "@/components/Spinner";
 import { CONTROL_CLASS } from "@/components/Field";
+import { RouteMap } from "@/components/RouteMap";
 import {
   getDashboard,
   listConsignments,
@@ -66,6 +67,8 @@ function DashboardView() {
   const [optimizeMsg, setOptimizeMsg] = useState<string | null>(null);
   const [unassigned, setUnassigned] = useState<number[]>([]);
   const [expanded, setExpanded] = useState<number | null>(null);
+  const [routeViewMode, setRouteViewMode] = useState<"MAP" | "LIST">("MAP");
+  const [selectedMapRouteId, setSelectedMapRouteId] = useState<number | null>(null);
 
   const reloadConsignments = useCallback(
     async (statusArg: "" | ConsignmentStatus, qArg: string) => {
@@ -363,9 +366,42 @@ function DashboardView() {
         </div>
       </section>
 
-      {/* Routes */}
+      {/* Routes Section */}
       <section className="mt-8">
-        <h2 className="text-lg font-semibold text-ink">{t("dashboard.routes")}</h2>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold text-ink">{t("dashboard.routes")}</h2>
+            <p className="text-xs text-slate-500">
+              {routes.length} {t("dashboard.routes").toLowerCase()} planned today
+            </p>
+          </div>
+
+          {/* View Mode Toggle */}
+          <div className="inline-flex rounded-lg border border-slate-200 bg-white p-0.5 shadow-sm">
+            <button
+              type="button"
+              onClick={() => setRouteViewMode("MAP")}
+              className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
+                routeViewMode === "MAP"
+                  ? "bg-brand-600 text-white shadow-sm"
+                  : "text-slate-600 hover:text-brand-700"
+              }`}
+            >
+              <span>🗺️</span> {t("map.viewModeMap")}
+            </button>
+            <button
+              type="button"
+              onClick={() => setRouteViewMode("LIST")}
+              className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition-colors ${
+                routeViewMode === "LIST"
+                  ? "bg-brand-600 text-white shadow-sm"
+                  : "text-slate-600 hover:text-brand-700"
+              }`}
+            >
+              <span>📋</span> {t("map.viewModeList")}
+            </button>
+          </div>
+        </div>
 
         {unassigned.length > 0 ? (
           <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
@@ -380,6 +416,17 @@ function DashboardView() {
           <p className="mt-4 rounded-xl border border-slate-200 bg-white px-4 py-8 text-center text-sm text-slate-400">
             {t("dashboard.noRoutes")}
           </p>
+        ) : routeViewMode === "MAP" ? (
+          <div className="mt-4">
+            <RouteMap
+              routes={routes}
+              unassignedConsignments={consignments.filter((c) =>
+                unassigned.includes(c.id),
+              )}
+              selectedRouteId={selectedMapRouteId}
+              onSelectRoute={setSelectedMapRouteId}
+            />
+          </div>
         ) : (
           <div className="mt-4 space-y-4">
             {routes.map((route) => (
@@ -390,6 +437,10 @@ function DashboardView() {
                 onToggle={() =>
                   setExpanded(expanded === route.id ? null : route.id)
                 }
+                onViewOnMap={() => {
+                  setSelectedMapRouteId(route.id);
+                  setRouteViewMode("MAP");
+                }}
                 lang={lang}
                 t={t}
               />
@@ -441,12 +492,14 @@ function RouteCard({
   route,
   expanded,
   onToggle,
+  onViewOnMap,
   lang,
   t,
 }: {
   route: RouteOut;
   expanded: boolean;
   onToggle: () => void;
+  onViewOnMap: () => void;
   lang: Lang;
   t: (k: string) => string;
 }) {
@@ -456,13 +509,13 @@ function RouteCard({
       : "—";
   return (
     <div className="card overflow-hidden">
-      <button
-        type="button"
-        onClick={onToggle}
-        className="flex w-full flex-wrap items-center justify-between gap-3 px-5 py-4 text-left hover:bg-slate-50/60"
-        aria-expanded={expanded}
-      >
-        <div className="flex items-center gap-3">
+      <div className="flex w-full flex-wrap items-center justify-between gap-3 px-5 py-4 hover:bg-slate-50/60">
+        <button
+          type="button"
+          onClick={onToggle}
+          className="flex flex-1 items-center gap-3 text-left"
+          aria-expanded={expanded}
+        >
           <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-brand-50 text-brand-600">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <circle cx="12" cy="10" r="3" />
@@ -477,8 +530,9 @@ function RouteCard({
               {t("dashboard.optimizer")}: {route.optimizer ?? "—"}
             </p>
           </div>
-        </div>
-        <div className="flex items-center gap-4">
+        </button>
+
+        <div className="flex items-center gap-3">
           <div className="text-right">
             <p className="text-xs text-slate-400">{t("dashboard.stops")}</p>
             <p className="text-sm font-semibold text-slate-700">
@@ -490,22 +544,41 @@ function RouteCard({
             <p className="text-sm font-semibold text-slate-700">{km} km</p>
           </div>
           <StatusBadge status={route.status} kind="route" />
-          <svg
-            width="18"
-            height="18"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            className={`text-slate-400 transition-transform ${expanded ? "rotate-180" : ""}`}
-            aria-hidden="true"
+
+          <Button
+            size="sm"
+            variant="secondary"
+            onClick={(e) => {
+              e.stopPropagation();
+              onViewOnMap();
+            }}
           >
-            <path d="m6 9 6 6 6-6" />
-          </svg>
+            <span>🗺️</span> {t("map.viewOnMap")}
+          </Button>
+
+          <button
+            type="button"
+            onClick={onToggle}
+            className="p-1 text-slate-400 hover:text-slate-600"
+            aria-label="Expand route stops"
+          >
+            <svg
+              width="18"
+              height="18"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className={`transition-transform ${expanded ? "rotate-180" : ""}`}
+              aria-hidden="true"
+            >
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </button>
         </div>
-      </button>
+      </div>
 
       {expanded ? (
         <ol className="border-t border-slate-100 px-5 py-4">
@@ -515,6 +588,12 @@ function RouteCard({
             route.stops.map((stop) => {
               const c = stop.consignment;
               const slot = c.confirmed_slot;
+              const hasCoords =
+                c.address.latitude != null && c.address.longitude != null;
+              const navUrl = hasCoords
+                ? `https://www.google.com/maps/dir/?api=1&destination=${c.address.latitude},${c.address.longitude}`
+                : undefined;
+
               return (
                 <li
                   key={stop.id}
@@ -527,6 +606,16 @@ function RouteCard({
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-medium text-ink">{c.recipient.name}</span>
                       <StatusBadge status={stop.status} kind="stop" />
+                      {navUrl && (
+                        <a
+                          href={navUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-brand-700 hover:bg-brand-50"
+                        >
+                          🧭 GPS
+                        </a>
+                      )}
                     </div>
                     <p className="text-sm text-slate-500">
                       {c.address.locality}

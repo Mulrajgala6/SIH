@@ -18,6 +18,17 @@ class AgentBrief(BaseModel):
     phone: str | None = None
 
 
+class PostOfficeBrief(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    code: str
+    name: str
+    pincode: str
+    latitude: float
+    longitude: float
+
+
 class RouteStopOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -34,6 +45,7 @@ class RouteOut(BaseModel):
 
     id: int
     post_office_id: int
+    post_office: PostOfficeBrief | None = None
     agent: AgentBrief | None = None
     route_date: datetime
     status: RouteStatus

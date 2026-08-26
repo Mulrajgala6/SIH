@@ -10,6 +10,7 @@ import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/Button";
 import { Spinner } from "@/components/Spinner";
 import { SelectField } from "@/components/Field";
+import { ConsignmentMap } from "@/components/ConsignmentMap";
 import {
   getConsignment,
   updateConsignment,
@@ -243,6 +244,13 @@ function Detail() {
               ) : null}
             </div>
           </div>
+
+          {/* Interactive Parcel Map Location */}
+          <ConsignmentMap
+            address={c.address}
+            recipientName={c.recipient.name}
+            trackingNumber={c.tracking_number}
+          />
         </div>
 
         {/* Right column: quick actions */}
