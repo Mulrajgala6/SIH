@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.api.deps import call_service, get_db, require_roles
+from app.models.entities import User
 from app.models.enums import Role
 from app.schemas.route import RouteOptimizeRequest, RouteOptimizeResponse, RouteOut
 from app.services import routing_service
@@ -24,8 +25,13 @@ _FIELD = require_roles(Role.SUPERVISOR, Role.ADMIN, Role.POSTMAN)
 
 @router.post("/optimize", response_model=RouteOptimizeResponse)
 def optimize(
-    req: RouteOptimizeRequest, db: Session = Depends(get_db), _user=Depends(_OPS)
+    req: RouteOptimizeRequest,
+    db: Session = Depends(get_db),
+    user: User = Depends(_OPS),
 ) -> RouteOptimizeResponse:
+    # If supervisor didn't specify a post office code, default to their assigned office
+    if user.role == Role.SUPERVISOR and user.post_office and not req.post_office_code:
+        req.post_office_code = user.post_office.code
     return call_service(routing_service.optimize_routes, db, req)
 
 
@@ -34,8 +40,13 @@ def list_routes(
     route_date: datetime | None = None,
     post_office_id: int | None = None,
     db: Session = Depends(get_db),
-    _user=Depends(_FIELD),
+    user: User = Depends(_FIELD),
 ) -> list[RouteOut]:
+    # Auto-scope supervisor to their assigned post office
+    if user.role == Role.SUPERVISOR and user.post_office_id is not None:
+        post_office_id = user.post_office_id
+    elif user.role == Role.POSTMAN and user.post_office_id is not None:
+        post_office_id = user.post_office_id
     rows = routing_service.list_routes(db, day=route_date, post_office_id=post_office_id)
     return [RouteOut.model_validate(r) for r in rows]
 

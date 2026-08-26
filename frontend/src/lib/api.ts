@@ -79,6 +79,8 @@ export interface UserOut {
   full_name: string;
   role: Role;
   phone: string | null;
+  post_office_id?: number | null;
+  post_office?: PostOfficeBrief | null;
 }
 
 export interface LoginResponse {
@@ -627,9 +629,13 @@ export function failDelivery(
 
 export function getDashboard(
   token: string,
+  post_office_id?: number | null,
   day?: string,
 ): Promise<DashboardOut> {
-  const query = buildQuery({ day });
+  const query = buildQuery({
+    day,
+    post_office_id: post_office_id ?? undefined,
+  });
   return apiFetch<DashboardOut>(`/api/v1/analytics/dashboard${query}`, {
     token,
   });

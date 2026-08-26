@@ -62,10 +62,13 @@ export default function DashboardPage() {
 
 function DashboardView() {
   const { t, lang } = useI18n();
-  const { token } = useAuth();
+  const { token, user } = useAuth();
+  const isAdmin = user?.role === "ADMIN";
 
   const [postOffices, setPostOffices] = useState<PostOfficeOut[]>([]);
-  const [selectedPoId, setSelectedPoId] = useState<number | null>(null);
+  const [selectedPoId, setSelectedPoId] = useState<number | null>(
+    user?.post_office_id ?? null
+  );
 
   const [dashboard, setDashboard] = useState<DashboardOut | null>(null);
   const [consignments, setConsignments] = useState<ConsignmentBrief[]>([]);
@@ -95,15 +98,19 @@ function DashboardView() {
 
   const currentPo = postOffices.find((p) => p.id === selectedPoId);
 
-  // Load initial post offices
+  // Load initial post offices and initialize role-based office
   useEffect(() => {
     listPostOffices()
       .then((pos) => {
         setPostOffices(pos);
-        if (pos.length > 0) setSelectedPoId(pos[0].id);
+        if (user?.role === "SUPERVISOR" && user?.post_office_id) {
+          setSelectedPoId(user.post_office_id);
+        } else if (!selectedPoId && pos.length > 0) {
+          setSelectedPoId(pos[0].id);
+        }
       })
       .catch(() => setPostOffices([]));
-  }, []);
+  }, [user]);
 
   const reloadConsignments = useCallback(
     async (poId: number | null, statusArg: "" | ConsignmentStatus, qArg: string) => {
@@ -128,9 +135,9 @@ function DashboardView() {
     [token, t],
   );
 
-  const reloadDashboard = useCallback(async () => {
+  const reloadDashboard = useCallback(async (poId?: number | null) => {
     if (!token) return;
-    const data = await getDashboard(token);
+    const data = await getDashboard(token, poId);
     setDashboard(data);
   }, [token]);
 
@@ -161,7 +168,7 @@ function DashboardView() {
     setError(null);
 
     Promise.all([
-      reloadDashboard(),
+      reloadDashboard(selectedPoId),
       reloadRoutes(selectedPoId),
       reloadConsignments(selectedPoId, status, q),
       reloadTransit(selectedPoId),
@@ -184,7 +191,7 @@ function DashboardView() {
       setUnassigned(res.unassigned_consignment_ids);
       await Promise.all([
         reloadRoutes(currentPo.id),
-        reloadDashboard(),
+        reloadDashboard(currentPo.id),
         reloadConsignments(currentPo.id, status, q),
       ]);
     } catch (e) {
@@ -245,7 +252,7 @@ function DashboardView() {
       await Promise.all([
         reloadTransit(selectedPoId),
         reloadRoutes(selectedPoId),
-        reloadDashboard(),
+        reloadDashboard(selectedPoId),
         reloadConsignments(selectedPoId, status, q),
       ]);
     } catch (e) {
@@ -272,9 +279,20 @@ function DashboardView() {
       {/* Header & Post Office Switcher */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-ink">
-            {lang === "hi" ? "डाकघर संचालन व नियंत्रण कक्ष" : "Post Office Operations & Control Room"}
-          </h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold text-ink">
+              {lang === "hi" ? "डाकघर संचालन व नियंत्रण कक्ष" : "Post Office Operations & Control Room"}
+            </h1>
+            {isAdmin ? (
+              <span className="rounded-full bg-purple-100 px-2.5 py-0.5 text-xs font-bold text-purple-700">
+                🌐 Global Admin
+              </span>
+            ) : (
+              <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-bold text-blue-700">
+                🏢 Regional Supervisor
+              </span>
+            )}
+          </div>
           <p className="mt-1 text-sm text-slate-500">
             {lang === "hi"
               ? "क्षेत्रीय रूट अनुकूलन, पार्सल क्लबिंग और अंतर-क्षेत्रीय ट्रांजिट प्रबंधन"
@@ -282,22 +300,31 @@ function DashboardView() {
           </p>
         </div>
 
-        {/* Region Switcher */}
+        {/* Region Switcher: Admin has dropdown to any region, Supervisor has fixed regional office */}
         <div className="flex flex-wrap items-center gap-3">
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-semibold text-slate-500 uppercase">🏢 Regional Hub:</span>
-            <select
-              value={selectedPoId ?? ""}
-              onChange={(e) => setSelectedPoId(Number(e.target.value))}
-              className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-ink shadow-sm focus:border-brand-500 focus:outline-none"
-            >
-              {postOffices.map((po) => (
-                <option key={po.id} value={po.id}>
-                  {po.code} · {po.name} ({po.pincode})
-                </option>
-              ))}
-            </select>
-          </div>
+          {isAdmin ? (
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-semibold text-slate-500 uppercase">🏢 Regional Hub:</span>
+              <select
+                value={selectedPoId ?? ""}
+                onChange={(e) => setSelectedPoId(Number(e.target.value))}
+                className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-ink shadow-sm focus:border-brand-500 focus:outline-none"
+              >
+                {postOffices.map((po) => (
+                  <option key={po.id} value={po.id}>
+                    {po.code} · {po.name} ({po.pincode})
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 shadow-xs">
+              <span className="text-xs font-semibold text-slate-500 uppercase">🏢 Office:</span>
+              <span className="text-sm font-bold text-ink">
+                {currentPo?.name ?? "Assigned Hub"} ({currentPo?.code})
+              </span>
+            </div>
+          )}
 
           <Button
             variant="primary"

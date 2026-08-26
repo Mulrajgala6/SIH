@@ -5,6 +5,7 @@ from __future__ import annotations
 from pydantic import BaseModel, ConfigDict, EmailStr
 
 from app.models.enums import Role
+from app.schemas.post_office import PostOfficeBrief
 
 
 class UserOut(BaseModel):
@@ -15,6 +16,8 @@ class UserOut(BaseModel):
     full_name: str
     role: Role
     phone: str | None = None
+    post_office_id: int | None = None
+    post_office: PostOfficeBrief | None = None
 
 
 class LoginRequest(BaseModel):

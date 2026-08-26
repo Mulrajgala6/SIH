@@ -80,7 +80,9 @@ class User(TimestampMixin, Base):
     phone: Mapped[str | None] = mapped_column(String(20))
     role: Mapped[Role] = mapped_column(enum_col(Role), index=True)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)
+    post_office_id: Mapped[int | None] = mapped_column(ForeignKey("post_offices.id"), index=True, nullable=True)
 
+    post_office: Mapped["PostOffice | None"] = relationship()
     agent: Mapped["DeliveryAgent | None"] = relationship(back_populates="user")
 
 

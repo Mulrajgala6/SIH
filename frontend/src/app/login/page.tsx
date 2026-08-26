@@ -10,14 +10,19 @@ import { Button } from "@/components/Button";
 
 interface DemoCred {
   role: string;
+  label?: string;
   email: string;
   password: string;
 }
 
 const DEMO_CREDS: DemoCred[] = [
-  { role: "ADMIN", email: "admin@daksync.in", password: "admin123" },
-  { role: "SUPERVISOR", email: "supervisor@daksync.in", password: "super123" },
-  { role: "POSTMAN", email: "postman1@daksync.in", password: "post123" },
+  { role: "ADMIN", label: "Global Admin", email: "admin@daksync.in", password: "admin123" },
+  { role: "SUPERVISOR", label: "Nashik HO Supervisor", email: "supervisor.nsk@daksync.in", password: "super123" },
+  { role: "SUPERVISOR", label: "Mumbai GPO Supervisor", email: "supervisor.bom@daksync.in", password: "super123" },
+  { role: "SUPERVISOR", label: "Pune HO Supervisor", email: "supervisor.pun@daksync.in", password: "super123" },
+  { role: "POSTMAN", label: "Beat Postman (Nashik)", email: "postman1@daksync.in", password: "post123" },
+  { role: "SENDER", label: "Customer Sender", email: "sender@daksync.in", password: "user123" },
+  { role: "RECIPIENT", label: "Customer Receiver", email: "recipient@daksync.in", password: "user123" },
 ];
 
 export default function LoginPage() {

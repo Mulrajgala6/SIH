@@ -8,6 +8,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_db, require_roles
+from app.models.entities import User
 from app.models.enums import Role
 from app.schemas.analytics import DashboardOut
 from app.services import analytics_service
@@ -19,6 +20,12 @@ _OPS = require_roles(Role.SUPERVISOR, Role.ADMIN)
 
 @router.get("/dashboard", response_model=DashboardOut)
 def dashboard(
-    day: datetime | None = None, db: Session = Depends(get_db), _user=Depends(_OPS)
+    day: datetime | None = None,
+    post_office_id: int | None = None,
+    db: Session = Depends(get_db),
+    user: User = Depends(_OPS),
 ) -> DashboardOut:
-    return analytics_service.dashboard(db, day=day)
+    # Auto-scope supervisor to their assigned post office
+    if user.role == Role.SUPERVISOR and user.post_office_id is not None:
+        post_office_id = user.post_office_id
+    return analytics_service.dashboard(db, day=day, post_office_id=post_office_id)

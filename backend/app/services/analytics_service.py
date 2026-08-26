@@ -58,16 +58,15 @@ def _first_attempt_success_rate(db: Session) -> float:
     return round(100.0 * successes / len(first_by_cons), 1)
 
 
-def dashboard(db: Session, day: datetime | None = None) -> DashboardOut:
+def dashboard(db: Session, day: datetime | None = None, post_office_id: int | None = None) -> DashboardOut:
     day = day or datetime.now(timezone.utc)
     start, end = _day_bounds(day)
 
-    # Status breakdown (all consignments).
-    status_rows = (
-        db.query(Consignment.status, func.count(Consignment.id))
-        .group_by(Consignment.status)
-        .all()
-    )
+    # Status breakdown
+    query = db.query(Consignment.status, func.count(Consignment.id))
+    if post_office_id is not None:
+        query = query.filter(Consignment.post_office_id == post_office_id)
+    status_rows = query.group_by(Consignment.status).all()
     status_counts = {s: c for s, c in status_rows}
     status_breakdown = [
         StatusCount(status=s.value if hasattr(s, "value") else str(s), count=c)
@@ -75,41 +74,47 @@ def dashboard(db: Session, day: datetime | None = None) -> DashboardOut:
     ]
 
     def _delivered_today() -> int:
-        return (
+        q = (
             db.query(func.count(Consignment.id))
             .filter(
                 Consignment.status == ConsignmentStatus.DELIVERED,
                 Consignment.delivery_date >= start,
                 Consignment.delivery_date < end,
             )
-            .scalar()
-            or 0
         )
+        if post_office_id is not None:
+            q = q.filter(Consignment.post_office_id == post_office_id)
+        return q.scalar() or 0
 
     def _failed_today() -> int:
-        return (
+        q = (
             db.query(func.count(Consignment.id))
             .filter(
                 Consignment.status == ConsignmentStatus.DELIVERY_FAILED,
                 Consignment.delivery_date >= start,
                 Consignment.delivery_date < end,
             )
-            .scalar()
-            or 0
         )
+        if post_office_id is not None:
+            q = q.filter(Consignment.post_office_id == post_office_id)
+        return q.scalar() or 0
 
     total_active = sum(status_counts.get(s, 0) for s in _ACTIVE)
     out_for_delivery = status_counts.get(ConsignmentStatus.OUT_FOR_DELIVERY, 0)
     pending_slot = status_counts.get(ConsignmentStatus.SLOT_PENDING, 0)
 
     # Slot distribution over parcels with a confirmed slot.
-    slot_rows = (
+    slot_q = (
         db.query(DeliverySlot, func.count(Consignment.id))
-        .outerjoin(Consignment, Consignment.confirmed_slot_id == DeliverySlot.id)
+        .outerjoin(
+            Consignment,
+            (Consignment.confirmed_slot_id == DeliverySlot.id)
+            & ((Consignment.post_office_id == post_office_id) if post_office_id is not None else True)
+        )
         .group_by(DeliverySlot.id)
         .order_by(DeliverySlot.sort_order)
-        .all()
     )
+    slot_rows = slot_q.all()
     slot_distribution = [
         SlotDistribution(
             slot_code=slot.code.value if hasattr(slot.code, "value") else str(slot.code),
@@ -119,19 +124,21 @@ def dashboard(db: Session, day: datetime | None = None) -> DashboardOut:
     ]
 
     # Routing snapshot.
-    routes_planned = (
+    route_q = (
         db.query(func.count(Route.id))
         .filter(Route.status.in_((RouteStatus.PLANNED, RouteStatus.DISPATCHED, RouteStatus.IN_PROGRESS)),
                 Route.route_date >= start, Route.route_date < end)
-        .scalar()
-        or 0
     )
-    total_distance_m = (
+    dist_q = (
         db.query(func.coalesce(func.sum(Route.total_distance_m), 0.0))
         .filter(Route.route_date >= start, Route.route_date < end)
-        .scalar()
-        or 0.0
     )
+    if post_office_id is not None:
+        route_q = route_q.filter(Route.post_office_id == post_office_id)
+        dist_q = dist_q.filter(Route.post_office_id == post_office_id)
+
+    routes_planned = route_q.scalar() or 0
+    total_distance_m = dist_q.scalar() or 0.0
 
     return DashboardOut(
         total_active=total_active,

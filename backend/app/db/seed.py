@@ -1,23 +1,20 @@
-"""Seed DAKSYNC with a realistic Nashik-based demo dataset.
+"""Seed DAKSYNC with a realistic multi-region postal network demo dataset.
 
 Run with:  ``python -m app.db.seed``   (resets the DB, then seeds)
 
-What it creates
----------------
+What it creates:
+----------------
 * 4 delivery slots (Morning / Midday / Afternoon / Evening), bilingual labels
-* 2 post offices (Nashik City HO, Nashik Road)
-* Demo users: 1 admin, 1 supervisor, 4 postmen (linked to delivery agents)
-* A handful of senders (couriers/banks/retailers)
-* ~18 recipients across Nashik localities, each with a *behaviour pattern*
-  (used only to generate realistic history — never shown to customers)
-* ~40 historical consignments + delivery attempts, where success correlates
-  with the recipient's preferred slot → real training signal for the Phase-4
-  recommender
-* ~18 active consignments dated today (mostly SLOT_CONFIRMED so a route can be
-  built in Phase 6; a few SLOT_PENDING awaiting the recipient), plus OTPs and
-  in-app notifications
-
-The dataset is deterministic (fixed RNG seed) so demos are reproducible.
+* 6 Regional Post Offices (Nashik HO, Nashik Road, Mumbai GPO, Andheri HO, Pune HO, Nagpur GPO)
+* RBAC Role Hierarchy:
+  - 1 System Admin (global access across all regions)
+  - 6 Regional Supervisors (1 assigned to each regional office)
+  - 14 Delivery Postmen (at least 2 in EACH office with active beats)
+  - Customer Accounts (Sender & Recipient)
+* Realistic recipients, addresses, and GPS coordinates across all 6 regions
+* Active deliverable parcels for each postman with confirmed slots and OTPs
+* Inter-region outgoing batches and in-transit clubbed bags
+* Historical delivery history for machine-learning recommender training
 """
 
 from __future__ import annotations
@@ -62,28 +59,51 @@ RNG = random.Random(4242)  # deterministic demo data
 # --------------------------------------------------------------------------- #
 # Static demo reference data
 # --------------------------------------------------------------------------- #
-# Approximate coordinates for localities (lat, lng).
-LOCALITIES: dict[str, tuple[float, float]] = {
-    # Nashik region
-    "Panchavati": (20.0110, 73.7929),
-    "College Road": (19.9975, 73.7570),
-    "Gangapur Road": (20.0050, 73.7500),
-    "Indira Nagar": (19.9720, 73.7680),
-    "CIDCO": (19.9640, 73.7480),
-    "Mahatma Nagar": (19.9880, 73.7420),
-    "Govind Nagar": (19.9790, 73.7620),
-    "Adgaon": (20.0430, 73.8290),
-    "Satpur": (19.9990, 73.7150),
-    "Deolali": (19.9440, 73.8300),
-    "Nashik Road": (19.9450, 73.8380),
-    "Old Nashik": (19.9930, 73.7960),
-    # Mumbai region
-    "Fort / GPO": (18.9390, 72.8355),
-    "Bandra": (19.0596, 72.8295),
-    "Andheri": (19.1136, 72.8697),
-    # Pune region
-    "Shivajinagar": (18.5314, 73.8446),
-    "Kothrud": (18.5074, 73.8077),
+# 6 Regional Post Offices (code, name, pincode, lat, lng)
+POST_OFFICES = [
+    ("NSK-HO", "Nashik City Head Post Office", "422001", 19.9975, 73.7898),
+    ("NSK-RD", "Nashik Road Post Office", "422101", 19.9450, 73.8380),
+    ("BOM-GPO", "Mumbai General Post Office", "400001", 18.9400, 72.8350),
+    ("BOM-AND", "Andheri Head Post Office", "400069", 19.1190, 72.8460),
+    ("PUN-HO", "Pune Head Post Office", "411001", 18.5204, 73.8567),
+    ("NGP-GPO", "Nagpur General Post Office", "440001", 21.1500, 79.0800),
+]
+
+# Localities mapped to their serving post office
+LOCALITIES: dict[str, tuple[float, float, str]] = {
+    # Nashik City HO
+    "Panchavati": (20.0110, 73.7929, "NSK-HO"),
+    "College Road": (19.9975, 73.7570, "NSK-HO"),
+    "Gangapur Road": (20.0050, 73.7500, "NSK-HO"),
+    "Indira Nagar": (19.9720, 73.7680, "NSK-HO"),
+    "Mahatma Nagar": (19.9880, 73.7420, "NSK-HO"),
+    "Govind Nagar": (19.9790, 73.7620, "NSK-HO"),
+    "Old Nashik": (19.9930, 73.7960, "NSK-HO"),
+    # Nashik Road
+    "Deolali": (19.9440, 73.8300, "NSK-RD"),
+    "Nashik Road Station": (19.9450, 73.8380, "NSK-RD"),
+    "Adgaon": (20.0430, 73.8290, "NSK-RD"),
+    "CIDCO Nashik": (19.9640, 73.7480, "NSK-RD"),
+    # Mumbai GPO (South Mumbai)
+    "Fort / GPO": (18.9390, 72.8355, "BOM-GPO"),
+    "Colaba": (18.9067, 72.8147, "BOM-GPO"),
+    "Nariman Point": (18.9260, 72.8230, "BOM-GPO"),
+    "Marine Lines": (18.9430, 72.8230, "BOM-GPO"),
+    # Mumbai Andheri (Suburbs)
+    "Andheri West": (19.1363, 72.8277, "BOM-AND"),
+    "Andheri East": (19.1155, 72.8688, "BOM-AND"),
+    "Lokhandwala": (19.1411, 72.8248, "BOM-AND"),
+    "Juhu": (19.1075, 72.8263, "BOM-AND"),
+    # Pune HO
+    "Shivajinagar": (18.5314, 73.8446, "PUN-HO"),
+    "Kothrud": (18.5074, 73.8077, "PUN-HO"),
+    "Deccan Gymkhana": (18.5160, 73.8410, "PUN-HO"),
+    "Viman Nagar": (18.5679, 73.9143, "PUN-HO"),
+    # Nagpur GPO
+    "Sitabuldi": (21.1458, 79.0832, "NGP-GPO"),
+    "Dharampeth": (21.1440, 79.0620, "NGP-GPO"),
+    "Civil Lines Nagpur": (21.1560, 79.0720, "NGP-GPO"),
+    "Ramdaspeth": (21.1350, 79.0730, "NGP-GPO"),
 }
 
 # code -> (label_en, label_hi, start_minutes, end_minutes, sort_order)
@@ -94,93 +114,96 @@ SLOTS: dict[SlotCode, tuple[str, str, int, int, int]] = {
     SlotCode.EVENING: ("Evening (5 – 7 PM)", "शाम (5 – 7 बजे)", 1020, 1140, 4),
 }
 
-# post office: (code, name, pincode, lat, lng)
-POST_OFFICES = [
-    ("NSK-HO", "Nashik City Head Post Office", "422001", 19.9975, 73.7898),
-    ("NSK-RD", "Nashik Road Post Office", "422101", 19.9450, 73.8380),
-    ("BOM-GPO", "Mumbai General Post Office", "400001", 18.9400, 72.8350),
-    ("PUN-HO", "Pune Head Post Office", "411001", 18.5204, 73.8567),
+# Supervisor staff accounts per region
+SUPERVISORS = [
+    ("System Admin", "admin@daksync.in", "admin123", Role.ADMIN, None),
+    ("Nashik HO Supervisor", "supervisor.nsk@daksync.in", "super123", Role.SUPERVISOR, "NSK-HO"),
+    ("Nashik Road Supervisor", "supervisor.nskrd@daksync.in", "super123", Role.SUPERVISOR, "NSK-RD"),
+    ("Mumbai GPO Supervisor", "supervisor.bom@daksync.in", "super123", Role.SUPERVISOR, "BOM-GPO"),
+    ("Andheri HO Supervisor", "supervisor.andheri@daksync.in", "super123", Role.SUPERVISOR, "BOM-AND"),
+    ("Pune HO Supervisor", "supervisor.pun@daksync.in", "super123", Role.SUPERVISOR, "PUN-HO"),
+    ("Nagpur GPO Supervisor", "supervisor.ngp@daksync.in", "super123", Role.SUPERVISOR, "NGP-GPO"),
+    ("Default Supervisor", "supervisor@daksync.in", "super123", Role.SUPERVISOR, "NSK-HO"),
 ]
 
-# Which post office serves which locality.
-PO_FOR_LOCALITY = {
-    "Deolali": "NSK-RD",
-    "Nashik Road": "NSK-RD",
-    "Adgaon": "NSK-RD",
-    "Fort / GPO": "BOM-GPO",
-    "Bandra": "BOM-GPO",
-    "Andheri": "BOM-GPO",
-    "Shivajinagar": "PUN-HO",
-    "Kothrud": "PUN-HO",
-}
-DEFAULT_PO = "NSK-HO"
-
-# Behaviour archetype -> preferred slot code (None = cold start, no history).
-ARCHETYPE_SLOT: dict[str, SlotCode | None] = {
-    "MORNING_PERSON": SlotCode.MORNING,
-    "MIDDAY_PERSON": SlotCode.MIDDAY,
-    "AFTERNOON_PERSON": SlotCode.AFTERNOON,
-    "EVENING_PERSON": SlotCode.EVENING,
-    "CHANGER": SlotCode.MORNING,   # requests morning; changes to evening in demo
-    "COLDSTART": None,
-}
-
-# recipient: (name, locality, language, archetype)
-RECIPIENTS = [
-    ("Aarti Deshmukh", "Panchavati", "hi", "MORNING_PERSON"),
-    ("Rohan Kulkarni", "College Road", "en", "EVENING_PERSON"),
-    ("Sneha Patil", "Gangapur Road", "en", "EVENING_PERSON"),
-    ("Vikram Jadhav", "Indira Nagar", "hi", "AFTERNOON_PERSON"),
-    ("Priya Sharma", "CIDCO", "en", "MIDDAY_PERSON"),
-    ("Amit Pawar", "Mahatma Nagar", "hi", "MORNING_PERSON"),
-    ("Neha Joshi", "Govind Nagar", "en", "EVENING_PERSON"),
-    ("Sagar Wagh", "Adgaon", "hi", "AFTERNOON_PERSON"),
-    ("Pooja More", "Satpur", "en", "MORNING_PERSON"),
-    ("Kiran Shinde", "Deolali", "hi", "EVENING_PERSON"),
-    ("Manish Gupta", "Nashik Road", "en", "MIDDAY_PERSON"),
-    ("Divya Rao", "Old Nashik", "en", "AFTERNOON_PERSON"),
-    ("Sunil Ahire", "Panchavati", "hi", "EVENING_PERSON"),
-    ("Rekha Bhosale", "College Road", "hi", "MORNING_PERSON"),
-    ("Tejas Sonawane", "CIDCO", "en", "CHANGER"),
-    ("Anjali Nair", "Gangapur Road", "en", "COLDSTART"),
-    ("Farhan Shaikh", "Indira Nagar", "hi", "COLDSTART"),
-    ("Meera Kulkarni", "Govind Nagar", "en", "AFTERNOON_PERSON"),
-    # Mumbai & Pune recipients
-    ("Rajesh Mehra", "Bandra", "en", "MORNING_PERSON"),
-    ("Shreya Bhatt", "Andheri", "en", "EVENING_PERSON"),
-    ("Nitin Gadgil", "Shivajinagar", "hi", "AFTERNOON_PERSON"),
-]
-
-# sender: (name, organization)
-SENDERS = [
-    ("Flipkart Logistics", "Flipkart"),
-    ("Amazon India", "Amazon"),
-    ("State Bank of India", "SBI"),
-    ("Reliance Digital", "Reliance"),
-    ("Rahul Verma", None),  # an individual sender
-]
-
-# agent: (full_name, email, po_code)
+# Postmen delivery agents (at least 2 per office)
 AGENTS = [
+    # Nashik City HO (3 postmen)
     ("Ramesh Gaikwad", "postman1@daksync.in", "NSK-HO"),
     ("Suresh Patil", "postman2@daksync.in", "NSK-HO"),
     ("Ganesh Jadhav", "postman3@daksync.in", "NSK-HO"),
+    # Nashik Road (2 postmen)
     ("Dinesh More", "postman4@daksync.in", "NSK-RD"),
-    ("Vikram Shinde", "postman5@daksync.in", "BOM-GPO"),
-    ("Sachin Sawant", "postman6@daksync.in", "BOM-GPO"),
-    ("Pravin Joshi", "postman7@daksync.in", "PUN-HO"),
+    ("Kailash Shinde", "postman5@daksync.in", "NSK-RD"),
+    # Mumbai GPO (2 postmen)
+    ("Vikram Shinde", "postman6@daksync.in", "BOM-GPO"),
+    ("Sachin Sawant", "postman7@daksync.in", "BOM-GPO"),
+    # Mumbai Andheri HO (2 postmen)
+    ("Pradeep Kadam", "postman8@daksync.in", "BOM-AND"),
+    ("Sunil Parab", "postman9@daksync.in", "BOM-AND"),
+    # Pune Head Post Office (2 postmen)
+    ("Pravin Joshi", "postman10@daksync.in", "PUN-HO"),
+    ("Nitin Kulkarni", "postman11@daksync.in", "PUN-HO"),
+    # Nagpur General Post Office (3 postmen)
+    ("Anand Raut", "postman12@daksync.in", "NGP-GPO"),
+    ("Manoj Meshram", "postman13@daksync.in", "NGP-GPO"),
+    ("Sanjay Bobde", "postman14@daksync.in", "NGP-GPO"),
+]
+
+SENDERS = [
+    ("Flipkart Logistics India", "Flipkart"),
+    ("Amazon Fulfillment Hub", "Amazon"),
+    ("State Bank of India (Cards)", "SBI"),
+    ("Reliance Digital Retail", "Reliance"),
+    ("Rahul Verma", None),
+]
+
+RECIPIENTS = [
+    # Nashik
+    ("Aarti Deshmukh", "Panchavati", "hi", "MORNING"),
+    ("Rohan Kulkarni", "College Road", "en", "EVENING"),
+    ("Sneha Patil", "Gangapur Road", "en", "EVENING"),
+    ("Vikram Jadhav", "Indira Nagar", "hi", "AFTERNOON"),
+    ("Amit Pawar", "Mahatma Nagar", "hi", "MORNING"),
+    ("Neha Joshi", "Govind Nagar", "en", "EVENING"),
+    ("Divya Rao", "Old Nashik", "en", "AFTERNOON"),
+    # Nashik Road
+    ("Kiran Shinde", "Deolali", "hi", "EVENING"),
+    ("Manish Gupta", "Nashik Road Station", "en", "MIDDAY"),
+    ("Sagar Wagh", "Adgaon", "hi", "AFTERNOON"),
+    ("Tejas Sonawane", "CIDCO Nashik", "en", "MORNING"),
+    # Mumbai GPO
+    ("Rajesh Mehra", "Fort / GPO", "en", "MORNING"),
+    ("Deepak Singhania", "Colaba", "en", "MIDDAY"),
+    ("Nisha Merchant", "Nariman Point", "en", "AFTERNOON"),
+    ("Harish Kapadia", "Marine Lines", "hi", "EVENING"),
+    # Mumbai Andheri
+    ("Shreya Bhatt", "Andheri West", "en", "EVENING"),
+    ("Rohit Shetty", "Andheri East", "hi", "MORNING"),
+    ("Pooja Malhotra", "Lokhandwala", "en", "AFTERNOON"),
+    ("Varun Dhawan", "Juhu", "en", "MIDDAY"),
+    # Pune HO
+    ("Nitin Gadgil", "Shivajinagar", "hi", "AFTERNOON"),
+    ("Ananya Deshpande", "Kothrud", "en", "MORNING"),
+    ("Siddharth Joshi", "Deccan Gymkhana", "mr", "MIDDAY"),
+    ("Pooja Kulkarni", "Viman Nagar", "en", "EVENING"),
+    # Nagpur GPO
+    ("Vivek Agrawal", "Sitabuldi", "hi", "MORNING"),
+    ("Meena Bhowmick", "Dharampeth", "hi", "AFTERNOON"),
+    ("Devendra Shukla", "Civil Lines Nagpur", "en", "MIDDAY"),
+    ("Ashwin Ganorkar", "Ramdaspeth", "mr", "EVENING"),
 ]
 
 PARCEL_DESCRIPTIONS = [
-    "Documents", "Electronics", "Clothing", "Books", "Bank card",
-    "Medicines", "Mobile accessory", "Cosmetics", "Gift", "Kitchenware",
+    "Aadhaar Card Update", "Passport Documents", "Debit Card / Chequebook",
+    "Electronics / Smartphone", "Prescription Medicines", "Apparel & Clothing",
+    "Exam Marksheet / Certificate", "Speed Post Document", "Festival Gift Hamper",
 ]
 
 
 def _jitter(coord: tuple[float, float]) -> tuple[float, float]:
-    """Small random offset so co-located recipients don't stack on one pin."""
     lat, lng = coord
-    return (lat + RNG.uniform(-0.004, 0.004), lng + RNG.uniform(-0.004, 0.004))
+    return (lat + RNG.uniform(-0.003, 0.003), lng + RNG.uniform(-0.003, 0.003))
 
 
 def _phone() -> str:
@@ -201,7 +224,7 @@ def seed(verbose: bool = True) -> dict[str, int]:
     tracking_seq = 100_000
 
     with SessionLocal() as db:
-        # -- Slots --------------------------------------------------------- #
+        # -- 1. Slots ------------------------------------------------------ #
         slots: dict[SlotCode, DeliverySlot] = {}
         for code, (en, hi, start, end, order) in SLOTS.items():
             slot = DeliverySlot(
@@ -213,7 +236,7 @@ def seed(verbose: bool = True) -> dict[str, int]:
         db.flush()
         counts["slots"] = len(slots)
 
-        # -- Post offices -------------------------------------------------- #
+        # -- 2. Post offices ----------------------------------------------- #
         offices: dict[str, PostOffice] = {}
         for code, name, pincode, lat, lng in POST_OFFICES:
             po = PostOffice(code=code, name=name, pincode=pincode, latitude=lat, longitude=lng)
@@ -222,42 +245,56 @@ def seed(verbose: bool = True) -> dict[str, int]:
         db.flush()
         counts["post_offices"] = len(offices)
 
-        # -- Staff & Customer users + agents ------------------------------- #
-        db.add(User(
-            email="admin@daksync.in", hashed_password=hash_password("admin123"),
-            full_name="System Admin", role=Role.ADMIN, phone=_phone(),
-        ))
-        db.add(User(
-            email="supervisor@daksync.in", hashed_password=hash_password("super123"),
-            full_name="Nashik Supervisor", role=Role.SUPERVISOR, phone=_phone(),
-        ))
+        # -- 3. Supervisors & Admin RBAC ----------------------------------- #
+        for full_name, email, pwd, role, po_code in SUPERVISORS:
+            po_id = offices[po_code].id if po_code else None
+            db.add(User(
+                email=email, hashed_password=hash_password(pwd),
+                full_name=full_name, role=role, phone=_phone(),
+                post_office_id=po_id,
+            ))
+        db.flush()
+
+        # Customer users
         db.add(User(
             email="sender@daksync.in", hashed_password=hash_password("user123"),
             full_name="Rahul Verma", role=Role.SENDER, phone="9820011223",
+            post_office_id=offices["NSK-HO"].id,
         ))
         db.add(User(
             email="recipient@daksync.in", hashed_password=hash_password("user123"),
             full_name="Aarti Deshmukh", role=Role.RECIPIENT, phone="9812345601",
+            post_office_id=offices["NSK-HO"].id,
         ))
+        db.flush()
+
+        # -- 4. Postmen Agents (at least 2 in each office) ----------------- #
         agents: list[DeliveryAgent] = []
+        agents_by_po: dict[str, list[DeliveryAgent]] = {}
         for full_name, email, po_code in AGENTS:
+            po = offices[po_code]
             user = User(
                 email=email, hashed_password=hash_password("post123"),
                 full_name=full_name, role=Role.POSTMAN, phone=_phone(),
+                post_office_id=po.id,
             )
             db.add(user)
             db.flush()
             agent = DeliveryAgent(
-                user_id=user.id, post_office_id=offices[po_code].id,
+                user_id=user.id, post_office_id=po.id,
                 name=full_name, phone=user.phone,
+                work_start_minutes=510,  # 08:30 AM
+                work_end_minutes=1230,   # 08:30 PM (covers all delivery slots)
+                daily_capacity=45,
             )
             db.add(agent)
             agents.append(agent)
+            agents_by_po.setdefault(po_code, []).append(agent)
         db.flush()
-        counts["users"] = 4 + len(AGENTS)
+        counts["users"] = len(SUPERVISORS) + 2 + len(AGENTS)
         counts["agents"] = len(agents)
 
-        # -- Senders ------------------------------------------------------- #
+        # -- 5. Senders ---------------------------------------------------- #
         senders: list[Sender] = []
         for name, org in SENDERS:
             s = Sender(name=name, organization=org, phone=_phone())
@@ -266,138 +303,97 @@ def seed(verbose: bool = True) -> dict[str, int]:
         db.flush()
         counts["senders"] = len(senders)
 
-        # -- Recipients + addresses --------------------------------------- #
-        recipients: list[tuple[Recipient, Address, str]] = []
-        for name, locality, lang, archetype in RECIPIENTS:
+        # -- 6. Recipients & Addresses across all 6 regions ---------------- #
+        recipients_list: list[tuple[Recipient, Address, str, str]] = []
+        for name, locality, lang, pref_slot in RECIPIENTS:
             r = Recipient(
                 name=name, phone="9812345601" if name == "Aarti Deshmukh" else _phone(),
                 preferred_language=lang,
-                behaviour_note=archetype,
+                behaviour_note=f"{pref_slot}_PERSON",
             )
             db.add(r)
             db.flush()
-            lat, lng = _jitter(LOCALITIES[locality])
-            po_code = PO_FOR_LOCALITY.get(locality, DEFAULT_PO)
+            lat, lng, po_code = LOCALITIES[locality]
+            jlat, jlng = _jitter((lat, lng))
+            city_name = offices[po_code].name.split()[0]
             addr = Address(
                 recipient_id=r.id,
-                line1=f"{RNG.randint(1, 200)}, {locality}",
-                line2=RNG.choice(["Near Bus Stop", "Opp. Temple", "2nd Lane", "Main Road"]),
+                line1=f"{RNG.randint(10, 150)}, {locality}",
+                line2=RNG.choice(["Near Post Box", "Opp. Community Center", "Sector 3", "Main Bazaar"]),
                 locality=locality, pincode=offices[po_code].pincode,
-                latitude=lat, longitude=lng, is_geocoded=True,
-                city="Mumbai" if po_code == "BOM-GPO" else ("Pune" if po_code == "PUN-HO" else "Nashik"),
+                latitude=jlat, longitude=jlng, is_geocoded=True,
+                city=city_name,
             )
             db.add(addr)
             db.flush()
-            recipients.append((r, addr, archetype))
-        counts["recipients"] = len(recipients)
-        counts["addresses"] = len(recipients)
+            recipients_list.append((r, addr, po_code, pref_slot))
+        counts["recipients"] = len(recipients_list)
+        counts["addresses"] = len(recipients_list)
 
-        # -- Historical consignments (training signal) -------------------- #
-        history_count = 0
-        attempts_count = 0
-        all_slot_codes = list(SLOTS.keys())
-        for r, addr, archetype in recipients:
-            preferred = ARCHETYPE_SLOT[archetype]
-            if preferred is None:
-                continue  # cold-start recipients have no history
-            po_code = PO_FOR_LOCALITY.get(addr.locality, DEFAULT_PO)
-            for _ in range(3):
-                slot_code = RNG.choice(all_slot_codes)
-                # Success correlates with the preferred slot (+10% noise).
-                success = (slot_code == preferred)
-                if RNG.random() < 0.10:
-                    success = not success
-                days_ago = RNG.randint(5, 45)
-                deliver_dt = _today_utc() - timedelta(days=days_ago)
-                slot = slots[slot_code]
+        # -- 7. Historical Delivery Training Dataset ----------------------- #
+        today = _today_utc()
+        hist_count = 0
+        for past_day_offset in range(1, 15):
+            past_day = today - timedelta(days=past_day_offset)
+            for r, addr, po_code, pref_slot in recipients_list[:18]:
+                sender = RNG.choice(senders)
+                slot_enum = getattr(SlotCode, pref_slot)
+                slot = slots[slot_enum]
                 cons = Consignment(
                     tracking_number=generate_tracking_number(tracking_seq),
-                    sender_id=RNG.choice(senders).id,
-                    recipient_id=r.id, address_id=addr.id,
+                    sender_id=sender.id, recipient_id=r.id, address_id=addr.id,
                     post_office_id=offices[po_code].id,
-                    origin_post_office_id=offices[DEFAULT_PO].id,
-                    status=ConsignmentStatus.DELIVERED if success
-                    else ConsignmentStatus.DELIVERY_FAILED,
+                    origin_post_office_id=offices["NSK-HO"].id,
                     priority=Priority.NORMAL,
                     description=RNG.choice(PARCEL_DESCRIPTIONS),
-                    weight_grams=RNG.randint(100, 3000),
-                    requested_slot_id=slot.id, confirmed_slot_id=slot.id,
-                    delivery_date=deliver_dt,
+                    weight_grams=RNG.randint(200, 1500),
+                    status=ConsignmentStatus.DELIVERED,
+                    delivery_date=past_day,
+                    requested_slot_id=slot.id,
+                    recommended_slot_id=slot.id,
+                    confirmed_slot_id=slot.id,
                 )
+                tracking_seq += 1
                 db.add(cons)
                 db.flush()
-                tracking_seq += 1
-                history_count += 1
-
-                db.add(SlotPreference(
-                    consignment_id=cons.id, slot_id=slot.id,
-                    preference_type=PreferenceType.RECIPIENT_CONFIRMED, source="history",
-                ))
+                # Record successful attempt
                 db.add(DeliveryAttempt(
-                    consignment_id=cons.id, agent_id=RNG.choice(agents).id,
-                    outcome=AttemptOutcome.SUCCESS if success else AttemptOutcome.FAILED,
-                    failure_reason=None if success else FailureReason.RECIPIENT_UNAVAILABLE,
-                    notes=None if success else "Recipient not available at attempted time.",
-                    attempted_at=deliver_dt,
+                    consignment_id=cons.id,
+                    outcome=AttemptOutcome.SUCCESS,
+                    notes="Delivered on time in customer preferred window",
+                    attempted_at=past_day + timedelta(minutes=slot.start_minutes + 30),
                 ))
-                attempts_count += 1
-        counts["historical_consignments"] = history_count
-        counts["delivery_attempts"] = attempts_count
+                hist_count += 1
+        counts["historical_consignments"] = hist_count
 
-        # -- Active consignments (today) ---------------------------------- #
-        today = _today_utc()
+        # -- 8. Active Deliverable Consignments for TODAY ------------------ #
         active_count = 0
         otp_count = 0
         notif_count = 0
-        # A few recipients await recipient action (SLOT_PENDING).
-        pending_indices = {rec_i for rec_i, (_, _, a) in enumerate(recipients)
-                           if a == "COLDSTART"}
-        pending_indices.update({1, 4})  # two extra confirmed→pending for demo variety
 
-        for idx, (r, addr, archetype) in enumerate(recipients):
-            preferred = ARCHETYPE_SLOT[archetype]
-            po_code = PO_FOR_LOCALITY.get(addr.locality, DEFAULT_PO)
+        pending_indices = {1, 3, 7, 12, 17}  # Variety of pending consignments across regions
+
+        # Create live deliverable parcels for EVERY post office and EVERY postman
+        for idx, (r, addr, po_code, pref_slot) in enumerate(recipients_list):
             sender = RNG.choice(senders)
-            base = dict(
-                tracking_number=generate_tracking_number(tracking_seq),
-                sender_id=sender.id, recipient_id=r.id, address_id=addr.id,
-                post_office_id=offices[po_code].id,
-                origin_post_office_id=offices["NSK-HO"].id,
-                priority=RNG.choices([Priority.NORMAL, Priority.HIGH, Priority.URGENT],
-                                     weights=[7, 2, 1])[0],
-                description=RNG.choice(PARCEL_DESCRIPTIONS),
-                weight_grams=RNG.randint(100, 3000),
-                delivery_date=today,
-            )
-            tracking_seq += 1
+            slot_enum = getattr(SlotCode, pref_slot)
+            slot = slots[slot_enum]
+            po = offices[po_code]
 
-            # Inter-region parcels for Mumbai/Pune
-            if po_code in ("BOM-GPO", "PUN-HO"):
-                if idx % 2 == 0:
-                    # BOOKED at origin (Nashik), ready to be clubbed
-                    cons = Consignment(
-                        **base, status=ConsignmentStatus.BOOKED,
-                    )
-                    db.add(cons)
-                    db.flush()
-                else:
-                    # IN_TRANSIT in transit bag
-                    cons = Consignment(
-                        **base, status=ConsignmentStatus.IN_TRANSIT,
-                        bag_number=f"BAG-NSK-{po_code[:3]}-8821",
-                    )
-                    db.add(cons)
-                    db.flush()
-                active_count += 1
-                continue
-
-            if idx in pending_indices or preferred is None:
-                # Awaiting recipient's slot choice / recommendation.
-                requested = slots[preferred] if preferred else None
+            if idx in pending_indices:
                 cons = Consignment(
-                    **base, status=ConsignmentStatus.SLOT_PENDING,
-                    requested_slot_id=requested.id if requested else None,
+                    tracking_number=generate_tracking_number(tracking_seq),
+                    sender_id=sender.id, recipient_id=r.id, address_id=addr.id,
+                    post_office_id=po.id,
+                    origin_post_office_id=offices["NSK-HO"].id,
+                    priority=RNG.choices([Priority.NORMAL, Priority.HIGH, Priority.URGENT], weights=[7, 2, 1])[0],
+                    description=RNG.choice(PARCEL_DESCRIPTIONS),
+                    weight_grams=RNG.randint(150, 2500),
+                    delivery_date=today,
+                    status=ConsignmentStatus.SLOT_PENDING,
+                    requested_slot_id=slot.id,
                 )
+                tracking_seq += 1
                 db.add(cons)
                 db.flush()
                 db.add(Notification(
@@ -405,40 +401,87 @@ def seed(verbose: bool = True) -> dict[str, int]:
                     type=NotificationType.SLOT_REQUEST, channel=NotificationChannel.IN_APP,
                     title_en="Choose your delivery time",
                     title_hi="अपना डिलीवरी समय चुनें",
-                    body_en=f"Parcel {cons.tracking_number} is ready. Please pick a slot.",
-                    body_hi=f"पार्सल {cons.tracking_number} तैयार है। कृपया समय चुनें।",
+                    body_en=f"Parcel {cons.tracking_number} is ready for scheduling.",
+                    body_hi=f"पार्सल {cons.tracking_number} डिलीवरी हेतु तैयार है।",
                 ))
                 notif_count += 1
+                active_count += 1
             else:
-                # Confirmed for the recipient's preferred slot → routable today.
-                slot = slots[preferred]
                 cons = Consignment(
-                    **base, status=ConsignmentStatus.SLOT_CONFIRMED,
-                    requested_slot_id=slot.id, recommended_slot_id=slot.id,
+                    tracking_number=generate_tracking_number(tracking_seq),
+                    sender_id=sender.id, recipient_id=r.id, address_id=addr.id,
+                    post_office_id=po.id,
+                    origin_post_office_id=offices["NSK-HO"].id,
+                    priority=RNG.choices([Priority.NORMAL, Priority.HIGH, Priority.URGENT], weights=[7, 2, 1])[0],
+                    description=RNG.choice(PARCEL_DESCRIPTIONS),
+                    weight_grams=RNG.randint(150, 2500),
+                    delivery_date=today,
+                    status=ConsignmentStatus.SLOT_CONFIRMED,
+                    requested_slot_id=slot.id,
+                    recommended_slot_id=slot.id,
                     confirmed_slot_id=slot.id,
                 )
+                tracking_seq += 1
                 db.add(cons)
                 db.flush()
+
+                # Record slot preference
                 db.add(SlotPreference(
                     consignment_id=cons.id, slot_id=slot.id,
-                    preference_type=PreferenceType.RECIPIENT_CONFIRMED, source="recipient",
+                    preference_type=PreferenceType.RECIPIENT_CONFIRMED, source="customer_confirmed",
                 ))
-                # Seed a fresh, unused OTP (valid 24h) for the delivery demo.
+                # OTP for verified delivery
                 db.add(OTPVerification(
                     consignment_id=cons.id, code=generate_otp(4),
                     expires_at=datetime.now(timezone.utc) + timedelta(hours=24),
                 ))
                 otp_count += 1
-                db.add(Notification(
-                    recipient_id=r.id, consignment_id=cons.id,
-                    type=NotificationType.SCHEDULED, channel=NotificationChannel.IN_APP,
-                    title_en="Delivery scheduled",
-                    title_hi="डिलीवरी निर्धारित",
-                    body_en=f"Parcel {cons.tracking_number} will arrive in the {slot.label_en}.",
-                    body_hi=f"पार्सल {cons.tracking_number} {slot.label_hi} में आएगा।",
-                ))
-                notif_count += 1
-            active_count += 1
+                active_count += 1
+
+        # -- 9. Inter-Region Outgoing & In-Transit Batches ------------------ #
+        # Outgoing from Nashik HO bound for Mumbai, Pune, Nagpur
+        dest_destinations = ["BOM-GPO", "BOM-AND", "PUN-HO", "NGP-GPO"]
+        for dest_code in dest_destinations:
+            dest_po = offices[dest_code]
+            # 2 Booked parcels waiting to be clubbed & dispatched
+            for b_i in range(2):
+                c_booked = Consignment(
+                    tracking_number=generate_tracking_number(tracking_seq),
+                    sender_id=senders[0].id,
+                    recipient_id=recipients_list[0][0].id,
+                    address_id=recipients_list[0][1].id,
+                    post_office_id=dest_po.id,
+                    origin_post_office_id=offices["NSK-HO"].id,
+                    priority=Priority.NORMAL,
+                    description=f"Inter-region package to {dest_code}",
+                    weight_grams=850,
+                    status=ConsignmentStatus.BOOKED,
+                    delivery_date=today,
+                )
+                tracking_seq += 1
+                db.add(c_booked)
+                active_count += 1
+
+            # 2 In-Transit parcels sealed in a transit bag en route
+            bag_tag = f"BAG-NSK-{dest_code.replace('-','')[:3]}-{RNG.randint(100, 999)}"
+            for t_i in range(2):
+                c_transit = Consignment(
+                    tracking_number=generate_tracking_number(tracking_seq),
+                    sender_id=senders[1].id,
+                    recipient_id=recipients_list[1][0].id,
+                    address_id=recipients_list[1][1].id,
+                    post_office_id=dest_po.id,
+                    origin_post_office_id=offices["NSK-HO"].id,
+                    priority=Priority.HIGH,
+                    description=f"Sealed transit parcel to {dest_code}",
+                    weight_grams=1200,
+                    status=ConsignmentStatus.IN_TRANSIT,
+                    bag_number=bag_tag,
+                    delivery_date=today,
+                )
+                tracking_seq += 1
+                db.add(c_transit)
+                active_count += 1
 
         counts["active_consignments"] = active_count
         counts["otps"] = otp_count
@@ -447,13 +490,14 @@ def seed(verbose: bool = True) -> dict[str, int]:
         db.commit()
 
     if verbose:
-        print("DAKSYNC seed complete:")
+        print("DAKSYNC 6-Region Seed Complete:")
         for key in sorted(counts):
             print(f"  {key:>26}: {counts[key]}")
-        print("\nDemo logins:")
-        print("  admin@daksync.in / admin123")
-        print("  supervisor@daksync.in / super123")
-        print("  postman1@daksync.in / post123  (also postman2..4)")
+        print("\nDemo RBAC Logins:")
+        print("  1. Global Admin:      admin@daksync.in / admin123 (Full multi-region access)")
+        print("  2. Regional Supvs:    supervisor.nsk@daksync.in, supervisor.bom@daksync.in, etc. / super123")
+        print("  3. Beat Postmen (14): postman1@daksync.in .. postman14@daksync.in / post123")
+        print("  4. Customers:         sender@daksync.in, recipient@daksync.in / user123")
     return counts
 
 
