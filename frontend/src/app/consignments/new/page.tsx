@@ -197,6 +197,36 @@ function BookingForm() {
             </p>
           </div>
 
+          {/* Operational Workflow Card */}
+          <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50/70 p-4">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+              Operational Routing & Intake
+            </h3>
+            <div className="mt-2.5 space-y-2 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500">Drop-off Origin Counter:</span>
+                <span className="font-semibold text-slate-800">{result.origin_post_office?.name ?? "Origin Hub"} ({result.origin_post_office?.code})</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500">Destination Delivery Office:</span>
+                <span className="font-semibold text-slate-800">{result.post_office?.name ?? "Destination Hub"} ({result.post_office?.code})</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-slate-500">Intake Status:</span>
+                <span className={`font-semibold ${result.status === "BOOKED" ? "text-indigo-700" : "text-emerald-700"}`}>
+                  {result.status === "BOOKED"
+                    ? `Queued at ${result.origin_post_office?.code} · Clustered into ${result.post_office?.code} Outbound Batch`
+                    : `Direct Local Delivery · ${result.post_office?.code}`}
+                </span>
+              </div>
+            </div>
+            {result.status === "BOOKED" ? (
+              <p className="mt-3 text-[11px] leading-relaxed text-slate-500 border-t border-slate-200/80 pt-2">
+                This parcel is held at the <strong>{result.origin_post_office?.name}</strong> counter. It is grouped into the outbound cluster batch for <strong>{result.post_office?.name}</strong> to be sealed into an inter-hub transit bag.
+              </p>
+            ) : null}
+          </div>
+
           <div className="mt-4">
             <p className="text-xs uppercase tracking-wide text-slate-400">
               {t("consignmentNew.shareLink")}

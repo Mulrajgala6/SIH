@@ -144,7 +144,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Text(
-                        '⚡ 1-TAP DEMO REGIONAL POSTMEN',
+                        'QUICK SELECT REGIONAL BEAT POSTMAN',
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w700,

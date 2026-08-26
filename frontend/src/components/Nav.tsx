@@ -65,8 +65,8 @@ export function Nav() {
   };
 
   return (
-    <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/90 backdrop-blur">
-      <nav className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-2 gap-y-2 px-4 py-3 sm:px-6">
+    <header className="sticky top-0 z-30 border-b border-slate-200/80 bg-white/95 backdrop-blur">
+      <nav className="mx-auto flex max-w-7xl flex-wrap items-center gap-x-2 gap-y-2 px-4 py-3.5 sm:px-8 lg:px-12">
         <Logo />
 
         <div className="ml-auto flex flex-wrap items-center gap-1.5">

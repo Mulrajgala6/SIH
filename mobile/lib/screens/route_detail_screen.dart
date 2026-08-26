@@ -187,7 +187,7 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
                 OutlinedButton.icon(
                   style: OutlinedButton.styleFrom(
                     foregroundColor: const Color(0xFF0284C7),
-                    side: const BorderBorder(color: Color(0xFFBAE6FD)),
+                    side: const BorderSide(color: Color(0xFFBAE6FD)),
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   ),
                   icon: const Icon(Icons.map, size: 18),
@@ -232,7 +232,7 @@ class _RouteDetailScreenState extends State<RouteDetailScreen> {
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(
-                        '⚡ NEXT STOP #${nextStop.sequence}',
+                        'NEXT DELIVERY · STOP #${nextStop.sequence}',
                         style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,

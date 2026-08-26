@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.models.entities import (
@@ -65,7 +65,14 @@ def dashboard(db: Session, day: datetime | None = None, post_office_id: int | No
     # Status breakdown
     query = db.query(Consignment.status, func.count(Consignment.id))
     if post_office_id is not None:
-        query = query.filter(Consignment.post_office_id == post_office_id)
+        query = query.filter(
+            or_(
+                # Parcels delivered or received for delivery by this PO
+                (Consignment.post_office_id == post_office_id) & (Consignment.status != ConsignmentStatus.BOOKED),
+                # Counter drop-offs booked at this PO awaiting clubbed dispatch
+                (Consignment.origin_post_office_id == post_office_id) & (Consignment.status == ConsignmentStatus.BOOKED),
+            )
+        )
     status_rows = query.group_by(Consignment.status).all()
     status_counts = {s: c for s, c in status_rows}
     status_breakdown = [

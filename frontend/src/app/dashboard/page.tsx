@@ -336,7 +336,7 @@ function DashboardView() {
                 <Spinner label={t("dashboard.optimizing")} />
               </span>
             ) : (
-              `⚡ Optimize ${currentPo?.code ?? ""} Routes`
+              `Optimize ${currentPo?.code ?? ""} Delivery Routes`
             )}
           </Button>
         </div>
@@ -478,8 +478,7 @@ function DashboardView() {
 
           {routes.length === 0 ? (
             <div className="mt-4 rounded-xl border border-slate-200 bg-white px-4 py-12 text-center text-slate-400">
-              <p className="text-3xl">🛣️</p>
-              <p className="mt-2 text-sm">{t("dashboard.noRoutes")}</p>
+              <p className="text-sm">{t("dashboard.noRoutes")}</p>
               <Button
                 variant="primary"
                 size="sm"
@@ -487,7 +486,7 @@ function DashboardView() {
                 onClick={handleOptimize}
                 disabled={optimizing}
               >
-                ⚡ Run Optimizer Now
+                Run Route Optimizer
               </Button>
             </div>
           ) : routeViewMode === "MAP" ? (
@@ -537,32 +536,32 @@ function DashboardView() {
           <div>
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-base font-bold text-ink flex items-center gap-2">
-                  <span>📥</span> Incoming Transit Bags Arriving at {currentPo?.name}
+                <h3 className="text-base font-bold text-ink">
+                  Inbound Transit Bags ({currentPo?.name})
                 </h3>
-                <p className="text-xs text-slate-500">
-                  Batches dispatched from origin hubs heading to this office. Click Receive to unbag and confirm for today&apos;s routes.
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Dispatched consignments en route to this delivery office. Ingest bag to confirm parcels for route scheduling.
                 </p>
               </div>
             </div>
 
             {incomingBags.length === 0 ? (
               <div className="mt-3 rounded-lg border border-slate-200 bg-white p-6 text-center text-slate-400 text-sm">
-                📭 No in-transit bags currently en route to this office.
+                No in-transit bags currently en route to this office.
               </div>
             ) : (
               <div className="mt-3 grid gap-4 sm:grid-cols-2">
                 {incomingBags.map((bag) => {
                   const isReceiving = receivingBagNo === bag.bag_number;
                   return (
-                    <div key={bag.bag_number} className="card p-5 border border-indigo-100 bg-indigo-50/30">
+                    <div key={bag.bag_number} className="card p-5 border border-slate-200 bg-white">
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <span className="inline-block rounded bg-indigo-600 px-2 py-0.5 font-mono text-xs font-bold text-white">
-                            👜 {bag.bag_number}
+                          <span className="inline-block rounded bg-indigo-50 border border-indigo-200 px-2 py-0.5 font-mono text-xs font-bold text-indigo-700">
+                            Bag #{bag.bag_number}
                           </span>
                           <h4 className="mt-2 text-sm font-bold text-ink">
-                            From: {bag.origin_post_office.name} ({bag.origin_post_office.code})
+                            Origin: {bag.origin_post_office.name} ({bag.origin_post_office.code})
                           </h4>
                           <p className="text-xs text-slate-500">
                             {bag.item_count} parcels · {(bag.total_weight_grams / 1000).toFixed(2)} kg
@@ -571,7 +570,7 @@ function DashboardView() {
                         <StatusBadge status="IN_TRANSIT" />
                       </div>
 
-                      <div className="mt-3 rounded bg-white p-2.5 text-xs text-slate-600 font-mono border border-slate-100 truncate">
+                      <div className="mt-3 rounded bg-slate-50 p-2.5 text-xs text-slate-600 font-mono border border-slate-100 truncate">
                         {bag.consignments.map((c) => c.tracking_number).join(", ")}
                       </div>
 
@@ -582,7 +581,7 @@ function DashboardView() {
                           onClick={() => handleReceive(bag.bag_number)}
                           disabled={isReceiving}
                         >
-                          {isReceiving ? "Unbagging…" : "⚡ 1-Click Receive & Unbag"}
+                          {isReceiving ? "Ingesting…" : "Receive & Ingest Bag"}
                         </Button>
                       </div>
                     </div>
@@ -595,12 +594,12 @@ function DashboardView() {
           {/* Manual Receive Input */}
           <div className="card p-4 border border-slate-200 bg-slate-50/60">
             <p className="text-xs font-semibold text-slate-600 uppercase">
-              Or Scan / Enter Custom Bag Number to Receive:
+              Manual Barcode Intake / Bag Ingestion:
             </p>
             <div className="mt-2 flex flex-wrap items-center gap-3">
               <input
                 type="text"
-                placeholder="e.g. BAG-NSK-BOM-882"
+                placeholder="BAG-NSK-BOM-042"
                 value={receiveInputNo}
                 onChange={(e) => setReceiveInputNo(e.target.value)}
                 className="w-72 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-mono text-ink uppercase"
@@ -611,7 +610,7 @@ function DashboardView() {
                 onClick={() => handleReceive()}
                 disabled={receivingBagNo !== null || !receiveInputNo.trim()}
               >
-                {receivingBagNo ? "Unbagging…" : "Receive Bag"}
+                {receivingBagNo ? "Ingesting…" : "Receive Bag"}
               </Button>
             </div>
           </div>
@@ -620,19 +619,18 @@ function DashboardView() {
           <div>
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-base font-bold text-ink flex items-center gap-2">
-                  <span>📤</span> Outgoing Parcels at {currentPo?.name} (Clubbed by Destination Hub)
+                <h3 className="text-base font-bold text-ink">
+                  Outbound Dispatch Batches ({currentPo?.name})
                 </h3>
-                <p className="text-xs text-slate-500">
-                  Booked parcels submitted at this counter clubbed together to seal into a transit bag.
+                <p className="text-xs text-slate-500 mt-0.5">
+                  Counter bookings grouped by destination office. Seal and dispatch into inter-hub transit bags.
                 </p>
               </div>
             </div>
 
             {outgoingGroups.length === 0 ? (
               <div className="mt-3 card p-8 text-center text-slate-400">
-                <p className="text-2xl">✨</p>
-                <p className="mt-2 text-sm">No pending outgoing inter-region parcels at this counter.</p>
+                <p className="text-sm">No pending outbound inter-region consignments at this office.</p>
               </div>
             ) : (
               <div className="mt-3 grid gap-4 sm:grid-cols-2">
@@ -643,7 +641,7 @@ function DashboardView() {
                     <div key={dest.id} className="card p-5 border border-slate-200">
                       <div className="flex items-start justify-between">
                         <div>
-                          <span className="inline-block rounded bg-indigo-50 px-2 py-0.5 font-mono text-xs font-bold text-indigo-700">
+                          <span className="inline-block rounded bg-slate-100 border border-slate-200 px-2 py-0.5 font-mono text-xs font-bold text-slate-700">
                             DEST: {dest.code}
                           </span>
                           <h4 className="mt-1 text-base font-bold text-ink">{dest.name}</h4>
@@ -668,7 +666,7 @@ function DashboardView() {
                           onClick={() => handleDispatch(group)}
                           disabled={isDispatchingThis}
                         >
-                          {isDispatchingThis ? "Sealing Bag…" : "👜 Dispatch Transit Bag"}
+                          {isDispatchingThis ? "Sealing Bag…" : "Dispatch Transit Bag"}
                         </Button>
                       </div>
                     </div>

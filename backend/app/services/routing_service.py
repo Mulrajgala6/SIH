@@ -58,16 +58,16 @@ def _pick_agent(db: Session, po_id: int, explicit_id: int | None) -> DeliveryAge
     )
 
 
-def _build_route_for_office(
+def _build_routes_for_office(
     db: Session, po: PostOffice, day: datetime,
     agent_id: int | None, start_minutes: int | None,
-) -> tuple[Route | None, list[int]]:
+) -> tuple[list[Route], list[int]]:
     consignments = _confirmed_for_office(db, po.id, day)
     # Only route parcels we can actually place on the map.
     routable = [c for c in consignments if c.address and c.address.latitude is not None]
     unassigned = [c.id for c in consignments if c not in routable]
     if not routable:
-        return None, unassigned
+        return [], unassigned
 
     # Remove any prior PLANNED route for this PO/day so re-optimizing is idempotent.
     day_start, day_end = _day_bounds(day)
@@ -81,66 +81,102 @@ def _build_route_for_office(
         db.delete(r)
     db.flush()
 
-    points = [(po.latitude, po.longitude)] + [
-        (c.address.latitude, c.address.longitude) for c in routable
-    ]
-    windows = [(0, 24 * 60)] + [
-        (c.confirmed_slot.start_minutes, c.confirmed_slot.end_minutes) for c in routable
-    ]
-    slot_start_by_point = {i + 1: routable[i].confirmed_slot.start_minutes for i in range(len(routable))}
+    # Determine postmen / delivery agents available for this office
+    if agent_id is not None:
+        target_agents = [db.get(DeliveryAgent, agent_id)]
+        target_agents = [a for a in target_agents if a is not None]
+    else:
+        target_agents = (
+            db.query(DeliveryAgent)
+            .filter(DeliveryAgent.post_office_id == po.id, DeliveryAgent.is_active.is_(True))
+            .order_by(DeliveryAgent.id)
+            .all()
+        )
+    if not target_agents:
+        target_agents = [None]
 
-    sol = routing.optimize(points, 0, time_windows=windows,
-                           avg_speed_kmph=DEFAULT_SPEED_KMPH, service_minutes=SERVICE_MINUTES)
+    num_agents = len(target_agents)
+    # Partition parcels across available postmen so every postman gets their own beat route
+    if num_agents > 1 and len(routable) >= num_agents:
+        import math
+        def _angle_from_po(c: Consignment) -> float:
+            dlat = (c.address.latitude or 0.0) - po.latitude
+            dlng = (c.address.longitude or 0.0) - po.longitude
+            return math.atan2(dlat, dlng)
 
-    order = sol.order
-    if sol.optimizer != "ortools":
-        # Present stops in slot order; stable sort keeps the distance-optimized
-        # sequence within each slot.
-        rest = [i for i in order if i != 0]
-        rest.sort(key=lambda i: slot_start_by_point.get(i, 0))
-        order = [0] + rest
+        sorted_routable = sorted(routable, key=_angle_from_po)
+        k, m = divmod(len(sorted_routable), num_agents)
+        agent_partitions = [
+            sorted_routable[i * k + min(i, m):(i + 1) * k + min(i + 1, m)]
+            for i in range(num_agents)
+        ]
+    else:
+        agent_partitions = [routable]
+        target_agents = [target_agents[0]]
 
-    # Recompute legs for the final order.
+    built_routes: list[Route] = []
     from app.utils.geo import haversine_m
-    legs = [0.0]
-    for k in range(1, len(order)):
-        a, b = points[order[k - 1]], points[order[k]]
-        legs.append(haversine_m(*a, *b))
-    total = sum(legs)
-
-    planned_start = start_minutes if start_minutes is not None else min(
-        (routable[i - 1].confirmed_slot.start_minutes for i in order if i != 0),
-        default=600,
-    )
-
-    agent = _pick_agent(db, po.id, agent_id)
-    route = Route(
-        post_office_id=po.id, agent_id=agent.id if agent else None,
-        route_date=day_start, status=RouteStatus.PLANNED,
-        planned_start_minutes=planned_start, total_distance_m=round(total, 1),
-        total_stops=len(routable), optimizer=sol.optimizer,
-        optimization_meta={"speed_kmph": DEFAULT_SPEED_KMPH, "service_minutes": SERVICE_MINUTES},
-    )
-    db.add(route)
-    db.flush()
-
     speed_m_per_min = (DEFAULT_SPEED_KMPH * 1000.0) / 60.0
-    clock = float(planned_start)
-    seq = 1
-    for k in range(1, len(order)):
-        cons = routable[order[k] - 1]
-        clock += legs[k] / max(speed_m_per_min, 1e-6) + SERVICE_MINUTES
-        # Don't show an ETA before the slot opens.
-        eta = max(int(round(clock)), cons.confirmed_slot.start_minutes)
-        clock = float(eta)
-        db.add(RouteStop(
-            route_id=route.id, consignment_id=cons.id, sequence=seq,
-            status=StopStatus.PENDING, eta_minutes=eta,
-            distance_from_prev_m=round(legs[k], 1),
-        ))
-        seq += 1
 
-    return route, unassigned
+    for agent, cluster in zip(target_agents, agent_partitions):
+        if not cluster:
+            continue
+
+        points = [(po.latitude, po.longitude)] + [
+            (c.address.latitude, c.address.longitude) for c in cluster
+        ]
+        windows = [(0, 24 * 60)] + [
+            (c.confirmed_slot.start_minutes, c.confirmed_slot.end_minutes) for c in cluster
+        ]
+        slot_start_by_point = {i + 1: cluster[i].confirmed_slot.start_minutes for i in range(len(cluster))}
+
+        sol = routing.optimize(points, 0, time_windows=windows,
+                               avg_speed_kmph=DEFAULT_SPEED_KMPH, service_minutes=SERVICE_MINUTES)
+
+        order = sol.order
+        if sol.optimizer != "ortools":
+            rest = [i for i in order if i != 0]
+            rest.sort(key=lambda i: slot_start_by_point.get(i, 0))
+            order = [0] + rest
+
+        legs = [0.0]
+        for idx in range(1, len(order)):
+            a, b = points[order[idx - 1]], points[order[idx]]
+            legs.append(haversine_m(*a, *b))
+        total = sum(legs)
+
+        planned_start = start_minutes if start_minutes is not None else min(
+            (cluster[i - 1].confirmed_slot.start_minutes for i in order if i != 0),
+            default=600,
+        )
+
+        route = Route(
+            post_office_id=po.id, agent_id=agent.id if agent else None,
+            route_date=day_start, status=RouteStatus.PLANNED,
+            planned_start_minutes=planned_start, total_distance_m=round(total, 1),
+            total_stops=len(cluster), optimizer=sol.optimizer,
+            optimization_meta={"speed_kmph": DEFAULT_SPEED_KMPH, "service_minutes": SERVICE_MINUTES},
+        )
+        db.add(route)
+        db.flush()
+
+        clock = float(planned_start)
+        seq = 1
+        for idx in range(1, len(order)):
+            cons = cluster[order[idx] - 1]
+            clock += legs[idx] / max(speed_m_per_min, 1e-6) + SERVICE_MINUTES
+            eta = max(int(round(clock)), cons.confirmed_slot.start_minutes)
+            clock = float(eta)
+            db.add(RouteStop(
+                route_id=route.id, consignment_id=cons.id, sequence=seq,
+                status=StopStatus.PENDING, eta_minutes=eta,
+                distance_from_prev_m=round(legs[idx], 1),
+            ))
+            seq += 1
+
+        built_routes.append(route)
+
+    return built_routes, unassigned
 
 
 def optimize_routes(db: Session, req: RouteOptimizeRequest) -> RouteOptimizeResponse:
@@ -160,15 +196,14 @@ def optimize_routes(db: Session, req: RouteOptimizeRequest) -> RouteOptimizeResp
         ]
         offices = [db.get(PostOffice, pid) for pid in po_ids]
 
-    routes = []
+    routes: list[Route] = []
     unassigned: list[int] = []
     for po in offices:
         if po is None:
             continue
-        route, un = _build_route_for_office(db, po, day, req.agent_id, req.start_minutes)
+        po_routes, un = _build_routes_for_office(db, po, day, req.agent_id, req.start_minutes)
         unassigned.extend(un)
-        if route is not None:
-            routes.append(route)
+        routes.extend(po_routes)
 
     db.commit()
     for r in routes:

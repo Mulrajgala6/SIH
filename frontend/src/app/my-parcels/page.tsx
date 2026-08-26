@@ -96,7 +96,7 @@ function MyParcelsContent() {
               : "border-transparent text-slate-500 hover:text-slate-700"
           }`}
         >
-          <span>📦 {lang === "hi" ? "भेजे गए पार्सल" : "Sent Parcels"}</span>
+          <span>{lang === "hi" ? "भेजे गए पार्सल" : "Outbound Shipments"}</span>
           <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
             {sentParcels.length}
           </span>
@@ -109,7 +109,7 @@ function MyParcelsContent() {
               : "border-transparent text-slate-500 hover:text-slate-700"
           }`}
         >
-          <span>📬 {lang === "hi" ? "आने वाले पार्सल" : "Incoming Parcels"}</span>
+          <span>{lang === "hi" ? "आने वाले पार्सल" : "Inbound Deliveries"}</span>
           <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
             {receivedParcels.length}
           </span>
@@ -128,15 +128,14 @@ function MyParcelsContent() {
           </div>
         ) : activeList.length === 0 ? (
           <div className="card p-12 text-center">
-            <p className="text-3xl">📭</p>
-            <h3 className="mt-3 text-base font-semibold text-ink">
+            <h3 className="text-base font-semibold text-ink">
               {tab === "sent"
                 ? lang === "hi"
                   ? "आपने अभी तक कोई पार्सल बुक नहीं किया है"
-                  : "No sent parcels found"
+                  : "No outbound shipments found"
                 : lang === "hi"
                 ? "आपके लिए कोई आने वाला पार्सल नहीं है"
-                : "No incoming parcels addressed to you"}
+                : "No inbound deliveries found"}
             </h3>
             <p className="mt-1 text-sm text-slate-500">
               {tab === "sent"

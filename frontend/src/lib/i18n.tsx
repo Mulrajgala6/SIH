@@ -109,13 +109,13 @@ const en = {
   },
   login: {
     title: "Sign in",
-    subtitle: "Access the DAKSYNC control room and booking tools.",
+    subtitle: "",
     email: "Email",
     password: "Password",
     signIn: "Sign in",
     signingIn: "Signing in…",
-    demoTitle: "Demo credentials",
-    demoHint: "Tap a row to fill the form.",
+    demoTitle: "Quick Access Accounts",
+    demoHint: "Select an account to pre-fill credentials.",
     invalid: "Invalid email or password.",
     postmanNote:
       "Postmen use the DAKSYNC field app (Flutter) for on-road delivery. This web console is read-oriented for field staff.",
@@ -404,13 +404,13 @@ const hi: typeof en = {
   },
   login: {
     title: "साइन इन करें",
-    subtitle: "DAKSYNC कंट्रोल रूम और बुकिंग टूल तक पहुँचें।",
+    subtitle: "",
     email: "ईमेल",
     password: "पासवर्ड",
     signIn: "साइन इन करें",
     signingIn: "साइन इन हो रहा है…",
-    demoTitle: "डेमो क्रेडेंशियल",
-    demoHint: "फ़ॉर्म भरने के लिए किसी पंक्ति पर टैप करें।",
+    demoTitle: "त्वरित प्रवेश खाते",
+    demoHint: "क्रेडेंशियल भरने के लिए खाता चुनें।",
     invalid: "अमान्य ईमेल या पासवर्ड।",
     postmanNote:
       "डाकिया सड़क पर डिलीवरी के लिए DAKSYNC फील्ड ऐप (Flutter) का उपयोग करते हैं। यह वेब कंसोल फील्ड स्टाफ के लिए मुख्य रूप से पढ़ने हेतु है।",

@@ -386,9 +386,16 @@ def list_consignments(
     query = db.query(Consignment)
     if status is not None:
         query = query.filter(Consignment.status == status)
-    if post_office_id is not None:
+    if post_office_id is not None and origin_post_office_id is None:
+        query = query.filter(
+            or_(
+                (Consignment.post_office_id == post_office_id) & (Consignment.status != ConsignmentStatus.BOOKED),
+                (Consignment.origin_post_office_id == post_office_id) & (Consignment.status == ConsignmentStatus.BOOKED),
+            )
+        )
+    elif post_office_id is not None:
         query = query.filter(Consignment.post_office_id == post_office_id)
-    if origin_post_office_id is not None:
+    if origin_post_office_id is not None and post_office_id is None:
         query = query.filter(Consignment.origin_post_office_id == origin_post_office_id)
     if q:
         like = f"%{q}%"

@@ -4,18 +4,28 @@ Wires up the app, CORS, health checks, and the full API v1 router
 (auth, consignments, slots, routes, deliveries, analytics).
 """
 
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
 from app.api.v1.router import api_router
 from app.core.config import settings
+from app.db.init_db import ensure_schema
 from app.db.session import engine
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    ensure_schema()
+    yield
+
 
 app = FastAPI(
     title=settings.app_name,
     version=settings.app_version,
     description="AI-assisted delivery scheduling & route planning for India Post.",
+    lifespan=lifespan,
 )
 
 # CORS — allow the local Next.js frontend during development.
