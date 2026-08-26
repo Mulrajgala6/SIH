@@ -9,7 +9,7 @@ library;
 
 const String kApiBase = String.fromEnvironment(
   'API_BASE',
-  defaultValue: 'http://localhost:8000',
+  defaultValue: 'https://sih-production-8bdb.up.railway.app',
 );
 
 /// Everything below `/api/v1`.

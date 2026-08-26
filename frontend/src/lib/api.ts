@@ -9,8 +9,9 @@
  * every endpoint has a typed function. `apiFetch` centralises headers, JSON
  * encoding and error handling (it throws with the backend `detail` message).
  */
-export const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+export const API_URL = (
+  process.env.NEXT_PUBLIC_API_URL ?? "https://sih-production-8bdb.up.railway.app"
+).replace(/\/+$/, "");
 
 /* ------------------------------------------------------------------ */
 /* Enumerations                                                        */
