@@ -206,9 +206,24 @@ function Detail() {
               ) : null}
             </div>
             <div className="card p-5">
-              <p className="section-title">{t("detail.recipient")}</p>
+              <div className="flex items-center justify-between">
+                <p className="section-title">{t("detail.recipient")}</p>
+                <a
+                  href={`https://wa.me/${c.recipient.phone.replace(/\D/g, "").length === 10 ? `91${c.recipient.phone.replace(/\D/g, "")}` : c.recipient.phone.replace(/\D/g, "")}?text=${encodeURIComponent(`Namaste ${c.recipient.name || "Customer"}, your India Post parcel (${c.tracking_number}) slot confirmation link is:\n${typeof window !== "undefined" ? window.location.origin : ""}/confirm/${c.id}`)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-md bg-[#25D366]/10 px-2 py-1 text-xs font-semibold text-[#1EBE5D] hover:bg-[#25D366]/20 transition-colors"
+                  title="Send link on WhatsApp"
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.711 2.598 2.664-.698c.969.586 1.776.883 2.796.883 3.181 0 5.767-2.586 5.767-5.766.001-3.18-2.585-5.67-5.767-5.67zm3.373 8.19c-.144.405-.837.774-1.17.824-.312.045-.634.072-1.872-.441-1.479-.613-2.482-2.115-2.557-2.215-.073-.1-1.077-1.433-1.077-2.732 0-1.299.68-1.938.922-2.202.241-.264.527-.33.703-.33.176 0 .352.002.505.01.162.008.38-.061.595.454.22.529.748 1.826.814 1.958.066.132.11.286.022.462-.088.176-.132.286-.264.44-.132.154-.277.344-.396.462-.132.132-.27.275-.116.539.154.264.685 1.13 1.47 1.83.992.884 1.829 1.159 2.093 1.291.264.132.418.11.572-.066.154-.176.66-.771.836-1.035.176-.264.352-.22.594-.132.242.088 1.54.726 1.804.858.264.132.44.198.506.308.066.11.066.639-.078 1.044z"/>
+                    <path d="M12 2C6.477 2 2 6.477 2 12c0 1.891.524 3.661 1.435 5.176L2 22l4.981-1.396A9.957 9.957 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2zm0 18.154c-1.637 0-3.15-.494-4.417-1.343l-.317-.213-3.275.918.924-3.19-.234-.337A8.136 8.136 0 013.846 12c0-4.496 3.658-8.154 8.154-8.154s8.154 3.658 8.154 8.154-3.658 8.154-8.154 8.154z"/>
+                  </svg>
+                  WhatsApp
+                </a>
+              </div>
               <p className="mt-2 text-sm font-medium text-ink">{c.recipient.name}</p>
-              <p className="text-sm text-slate-500">{c.recipient.phone}</p>
+              <p className="text-sm text-slate-500 font-mono">{c.recipient.phone}</p>
               <p className="text-xs text-slate-400">
                 {t("consignmentNew.preferredLanguage")}:{" "}
                 {t(`languageName.${c.recipient.preferred_language}`)}

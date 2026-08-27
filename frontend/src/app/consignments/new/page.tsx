@@ -244,6 +244,33 @@ function BookingForm() {
             </div>
           </div>
 
+          {/* WhatsApp Direct Share */}
+          <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50/70 p-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div>
+                <p className="text-xs font-bold text-emerald-900 flex items-center gap-1.5">
+                  <span className="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                  Direct WhatsApp Notification
+                </p>
+                <p className="mt-0.5 text-xs text-emerald-700">
+                  Recipient phone: <strong className="font-mono">{result.recipient.phone}</strong>
+                </p>
+              </div>
+              <a
+                href={`https://wa.me/${result.recipient.phone.replace(/\D/g, "").length === 10 ? `91${result.recipient.phone.replace(/\D/g, "")}` : result.recipient.phone.replace(/\D/g, "")}?text=${encodeURIComponent(`Namaste ${result.recipient.name || "Customer"}, your India Post parcel (${result.tracking_number}) has been booked! 📦\n\nPlease select your preferred delivery time slot here:\n👉 ${shareLink}\n\nनमस्ते ${result.recipient.name || ""}, कृपया अपनी सुविधा के अनुसार डिलीवरी समय चुनें।`)}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#25D366] px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-[#1EBE5D] transition-all transform active:scale-95"
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <path d="M12.031 6.172c-3.181 0-5.767 2.586-5.768 5.766-.001 1.298.38 2.27 1.019 3.287l-.711 2.598 2.664-.698c.969.586 1.776.883 2.796.883 3.181 0 5.767-2.586 5.767-5.766.001-3.18-2.585-5.67-5.767-5.67zm3.373 8.19c-.144.405-.837.774-1.17.824-.312.045-.634.072-1.872-.441-1.479-.613-2.482-2.115-2.557-2.215-.073-.1-1.077-1.433-1.077-2.732 0-1.299.68-1.938.922-2.202.241-.264.527-.33.703-.33.176 0 .352.002.505.01.162.008.38-.061.595.454.22.529.748 1.826.814 1.958.066.132.11.286.022.462-.088.176-.132.286-.264.44-.132.154-.277.344-.396.462-.132.132-.27.275-.116.539.154.264.685 1.13 1.47 1.83.992.884 1.829 1.159 2.093 1.291.264.132.418.11.572-.066.154-.176.66-.771.836-1.035.176-.264.352-.22.594-.132.242.088 1.54.726 1.804.858.264.132.44.198.506.308.066.11.066.639-.078 1.044z"/>
+                  <path d="M12 2C6.477 2 2 6.477 2 12c0 1.891.524 3.661 1.435 5.176L2 22l4.981-1.396A9.957 9.957 0 0012 22c5.523 0 10-4.477 10-10S17.523 2 12 2zm0 18.154c-1.637 0-3.15-.494-4.417-1.343l-.317-.213-3.275.918.924-3.19-.234-.337A8.136 8.136 0 013.846 12c0-4.496 3.658-8.154 8.154-8.154s8.154 3.658 8.154 8.154-3.658 8.154-8.154 8.154z"/>
+                </svg>
+                {t("consignmentNew.sendWhatsApp")}
+              </a>
+            </div>
+          </div>
+
           <div className="mt-6 flex flex-wrap gap-3">
             <Link
               href={`/confirm/${result.id}`}
