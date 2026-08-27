@@ -290,11 +290,27 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
                     style: OutlinedButton.styleFrom(
                       foregroundColor: const Color(0xFF16A34A),
                       side: const BorderSide(color: Color(0xFF86EFAC)),
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
                     ),
                     icon: const Icon(Icons.phone, size: 16),
                     label: const Text('Call'),
                     onPressed: () => MapLauncher.makePhoneCall(c.recipient.phone),
+                  ),
+                  const SizedBox(width: 6),
+                  ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF25D366),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 12),
+                    ),
+                    icon: const Icon(Icons.chat, size: 16),
+                    label: const Text('WhatsApp'),
+                    onPressed: () {
+                      final msg = _demoOtp != null
+                          ? 'Namaste ${c.recipient.name}, your India Post parcel (${c.trackingNumber}) is OUT FOR DELIVERY! 🚚📦\n\nYour Delivery Verification OTP is: $_demoOtp\n\nनमस्ते ${c.recipient.name}, आपका पार्सल आ चुका है। आपका OTP है: $_demoOtp'
+                          : 'Namaste ${c.recipient.name}, your India Post parcel (${c.trackingNumber}) is OUT FOR DELIVERY by your postman! 🚚📦';
+                      MapLauncher.sendWhatsApp(c.recipient.phone, msg);
+                    },
                   ),
                 ],
               ],
@@ -391,7 +407,7 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                if (_demoOtp != null) _demoOtpBanner(_demoOtp!),
+                if (_demoOtp != null) _demoOtpBanner(_demoOtp!, widget.stop.consignment),
                 const SizedBox(height: 12),
                 const Text('Enter the OTP provided by the recipient',
                     textAlign: TextAlign.center,
@@ -488,21 +504,47 @@ class _DeliveryScreenState extends State<DeliveryScreen> {
     }
   }
 
-  Widget _demoOtpBanner(String code) {
+  Widget _demoOtpBanner(String code, ConsignmentBrief c) {
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: const Color(0xFFFEF3C7),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(color: const Color(0xFFFDE68A)),
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Icon(Icons.sms_outlined, color: Color(0xFFB45309), size: 20),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text('Demo OTP for testing: $code',
-                style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF92400E))),
+          Row(
+            children: [
+              const Icon(Icons.sms_outlined, color: Color(0xFFB45309), size: 20),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text('Demo Delivery OTP: $code',
+                    style: const TextStyle(fontWeight: FontWeight.w700, color: Color(0xFF92400E), fontSize: 14)),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: ElevatedButton.icon(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFF25D366),
+                foregroundColor: Colors.white,
+                elevation: 0,
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              icon: const Icon(Icons.send_rounded, size: 16),
+              label: const Text('Send Out for Delivery & OTP on WhatsApp',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 12)),
+              onPressed: () {
+                final msg =
+                    'Namaste ${c.recipient.name}, your India Post parcel (${c.trackingNumber}) is OUT FOR DELIVERY! 🚚📦\n\nYour Delivery Verification OTP is: $code\n\nPlease share this 4-digit code with the postman at your doorstep.\n\nनमस्ते ${c.recipient.name}, आपका पार्सल डिलीवरी के लिए निकल चुका है। आपका OTP है: $code';
+                MapLauncher.sendWhatsApp(c.recipient.phone, msg);
+              },
+            ),
           ),
         ],
       ),

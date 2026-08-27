@@ -70,4 +70,25 @@ class MapLauncher {
     }
     return false;
   }
+
+  /// Launch WhatsApp with prefilled message to customer
+  static Future<bool> sendWhatsApp(String phoneNumber, String message) async {
+    String cleaned = phoneNumber.replaceAll(RegExp(r'\D'), '');
+    if (cleaned.length == 10) {
+      cleaned = '91$cleaned';
+    }
+    final encodedMsg = Uri.encodeComponent(message);
+    final url = 'https://wa.me/$cleaned?text=$encodedMsg';
+    final uri = Uri.parse(url);
+    try {
+      if (await canLaunchUrl(uri)) {
+        return await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        return await launchUrl(uri, mode: LaunchMode.platformDefault);
+      }
+    } catch (e) {
+      debugPrint('Could not launch WhatsApp: $e');
+      return false;
+    }
+  }
 }
