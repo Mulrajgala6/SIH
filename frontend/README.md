@@ -4,7 +4,7 @@ Bilingual (English / हिन्दी) Next.js 14 UI for the DAKSYNC India Pos
 delivery-scheduling prototype (SIH 2026). It talks to the FastAPI backend
 described in [`../docs/API_CONTRACT.md`](../docs/API_CONTRACT.md).
 
-## Stack & constraints
+## Stack & all the constraints
 
 - **Next.js 14** (App Router, `src/app`), **React 18**, **TypeScript** (strict).
 - **Tailwind CSS** for styling with the India Post design tokens in
